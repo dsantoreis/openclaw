@@ -104,6 +104,16 @@ export function resolveBootstrapMaxChars(cfg?: OpenClawConfig): number {
   return DEFAULT_BOOTSTRAP_MAX_CHARS;
 }
 
+export type ContextInjectionMode = "always" | "first-message-only";
+
+export function resolveContextInjection(cfg?: OpenClawConfig): ContextInjectionMode {
+  const raw = cfg?.agents?.defaults?.contextInjection;
+  if (raw === "first-message-only") {
+    return "first-message-only";
+  }
+  return "always";
+}
+
 export function resolveBootstrapTotalMaxChars(cfg?: OpenClawConfig): number {
   const raw = cfg?.agents?.defaults?.bootstrapTotalMaxChars;
   if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {

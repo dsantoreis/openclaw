@@ -43,6 +43,18 @@ export const AgentDefaultsSchema = z
     bootstrapPromptTruncationWarning: z
       .union([z.literal("off"), z.literal("once"), z.literal("always")])
       .optional(),
+    /**
+     * Controls when workspace context files (AGENTS.md, SOUL.md, etc.) are injected
+     * into the system prompt.
+     *
+     * - "always" (default): inject on every message (current behavior)
+     * - "first-message-only": inject only on the first message of a session,
+     *   reducing token usage by ~93% over long conversations.
+     *   The agent can still use the `read` tool to access workspace files as needed.
+     */
+    contextInjection: z
+      .union([z.literal("always"), z.literal("first-message-only")])
+      .optional(),
     userTimezone: z.string().optional(),
     timeFormat: z.union([z.literal("auto"), z.literal("12"), z.literal("24")]).optional(),
     envelopeTimezone: z.string().optional(),
