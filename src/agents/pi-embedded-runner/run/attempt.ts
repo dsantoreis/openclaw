@@ -713,37 +713,41 @@ export async function runEmbeddedAttempt(
     // existence, because pre-created, aborted, or repaired sessions can have a file
     // without any real conversation history.
     const contextInjectionMode = resolveContextInjection(params.config);
-    const hasUserMessages = await (async () => {
-      try {
-        const content = await fs.readFile(params.sessionFile, "utf-8");
-        // Each line is a JSONL record. We look for lines with "role":"user" that
-        // contain actual content — this avoids false positives from header-only
-        // transcripts, orphan entries left by aborted attempts, or repaired sessions
-        // where user entries may exist without meaningful conversation content.
-        for (const line of content.split("\n")) {
-          const trimmed = line.trim();
-          if (!trimmed) {
-            continue;
-          }
-          // Fast substring check before full parse
-          if (trimmed.includes('"role":"user"') || trimmed.includes('"role": "user"')) {
-            // Verify this is a real message with content, not a stale/orphan entry
+    // Only scan the transcript when "first-message-only" mode is active —
+    // avoids unnecessary O(n) I/O in the default "always" mode.
+    const hasUserMessages =
+      contextInjectionMode === "first-message-only"
+        ? await (async () => {
             try {
-              const parsed = JSON.parse(trimmed);
-              if (parsed.role === "user" && parsed.content) {
-                return true;
+              const content = await fs.readFile(params.sessionFile, "utf-8");
+              // Each line is a JSONL record. We look for lines with "role":"user"
+              // that contain actual content — this avoids false positives from
+              // header-only transcripts, orphan entries, or repaired sessions.
+              for (const line of content.split("\n")) {
+                const trimmed = line.trim();
+                if (!trimmed) {
+                  continue;
+                }
+                if (trimmed.includes('"role":"user"') || trimmed.includes('"role": "user"')) {
+                  try {
+                    const parsed = JSON.parse(trimmed);
+                    if (parsed.role === "user" && parsed.content) {
+                      return true;
+                    }
+                  } catch {
+                    // Parse failure on a corrupted line — skip rather than
+                    // treating as a positive signal (avoids disabling context
+                    // injection due to transient file corruption).
+                    continue;
+                  }
+                }
               }
+              return false;
             } catch {
-              // If we can't parse, the substring match is still a valid signal
-              return true;
+              return false;
             }
-          }
-        }
-        return false;
-      } catch {
-        return false;
-      }
-    })();
+          })()
+        : false;
     const skipContextInjection = contextInjectionMode === "first-message-only" && hasUserMessages;
 
     const { bootstrapFiles: hookAdjustedBootstrapFiles, contextFiles: rawContextFiles } =
