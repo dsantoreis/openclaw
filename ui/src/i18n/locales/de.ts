@@ -3,7 +3,7 @@ import type { TranslationMap } from "../lib/types.ts";
 export const de: TranslationMap = {
   common: {
     version: "Version",
-    health: "Zustand",
+    health: "Status",
     ok: "OK",
     offline: "Offline",
     connect: "Verbinden",
@@ -23,15 +23,15 @@ export const de: TranslationMap = {
     collapse: "Seitenleiste einklappen",
   },
   tabs: {
-    agents: "Agents",
+    agents: "Agenten",
     overview: "Übersicht",
     channels: "Kanäle",
     instances: "Instanzen",
     sessions: "Sitzungen",
     usage: "Nutzung",
     cron: "Cron-Aufgaben",
-    skills: "Skills",
-    nodes: "Knoten",
+    skills: "Fähigkeiten",
+    nodes: "Geräte",
     chat: "Chat",
     config: "Konfiguration",
     debug: "Debug",
@@ -41,7 +41,7 @@ export const de: TranslationMap = {
     agents: "Agent-Arbeitsbereiche, Tools und Identitäten verwalten.",
     overview: "Gateway-Status, Einstiegspunkte und eine schnelle Zustandsprüfung.",
     channels: "Kanäle und Einstellungen verwalten.",
-    instances: "Präsenzsignale von verbundenen Clients und Knoten.",
+    instances: "Präsenzsignale von verbundenen Clients und Geräten.",
     sessions: "Aktive Sitzungen inspizieren und Standardeinstellungen pro Sitzung anpassen.",
     usage: "API-Nutzung und Kosten überwachen.",
     cron: "Aufweckzeiten und wiederkehrende Agent-Läufe planen.",
@@ -80,11 +80,11 @@ export const de: TranslationMap = {
       sessions: "Sitzungen",
       sessionsHint: "Letzte vom Gateway verfolgte Sitzungsschlüssel.",
       cron: "Cron",
-      cronNext: "Nächste Aktivierung {time}",
+      cronNext: "Nächste Ausführung {time}",
     },
     notes: {
       title: "Notizen",
-      subtitle: "Kurze Erinnerungen für Fernsteuerungskonfigurationen.",
+      subtitle: "Kurze Hinweise für Remote-Steuerung.",
       tailscaleTitle: "Tailscale Serve",
       tailscaleText:
         "Bevorzugen Sie den Serve-Modus, um das Gateway auf Loopback mit Tailnet-Auth zu halten.",
@@ -100,7 +100,7 @@ export const de: TranslationMap = {
         "Authentifizierung fehlgeschlagen. Kopieren Sie erneut eine URL mit Token über {command}, oder aktualisieren Sie das Token und klicken Sie auf Verbinden.",
     },
     pairing: {
-      hint: "Dieses Gerät benötigt die Kopplungsgenehmigung vom Gateway-Host.",
+      hint: "Dieses Gerät benötigt eine Pairing-Freigabe vom Gateway-Host.",
       mobileHint:
         "Auf dem Mobilgerät? Kopieren Sie die vollständige URL (einschließlich #token=...) von openclaw dashboard --no-open auf Ihrem Desktop.",
     },
@@ -112,7 +112,7 @@ export const de: TranslationMap = {
   chat: {
     disconnected: "Verbindung zum Gateway getrennt.",
     refreshTitle: "Chat-Daten aktualisieren",
-    thinkingToggle: "Denk-/Arbeitsausgabe des Assistenten ein-/ausschalten",
+    thinkingToggle: "Ausgabe des Assistenten ein-/ausblenden",
     focusToggle: "Fokusmodus ein-/ausschalten (Seitenleiste + Kopfzeile ausblenden)",
     onboardingDisabled: "Während der Einrichtung deaktiviert",
   },
@@ -121,9 +121,6 @@ export const de: TranslationMap = {
     zhCN: "简体中文 (Vereinfachtes Chinesisch)",
     zhTW: "繁體中文 (Traditionelles Chinesisch)",
     ptBR: "Português (Brasilianisches Portugiesisch)",
-    nl: "Nederlands (Niederländisch)",
-    fr: "Français (Französisch)",
     de: "Deutsch",
-    it: "Italiano (Italienisch)",
   },
 };
