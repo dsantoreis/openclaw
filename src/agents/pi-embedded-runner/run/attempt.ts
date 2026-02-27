@@ -709,12 +709,29 @@ export async function runEmbeddedAttempt(
 
     // Check context injection mode: when "first-message-only", skip workspace context
     // files on subsequent messages to reduce token usage (~93% savings over conversations).
+    // We count actual user messages in the session transcript rather than checking file
+    // existence, because pre-created, aborted, or repaired sessions can have a file
+    // without any real conversation history.
     const contextInjectionMode = resolveContextInjection(params.config);
-    const sessionFileExists = await fs
-      .stat(params.sessionFile)
-      .then(() => true)
-      .catch(() => false);
-    const skipContextInjection = contextInjectionMode === "first-message-only" && sessionFileExists;
+    const hasUserMessages = await (async () => {
+      try {
+        const content = await fs.readFile(params.sessionFile, "utf-8");
+        // Each line is a JSON record; count lines with "role":"user" as real messages
+        let count = 0;
+        for (const line of content.split("\n")) {
+          if (!line.trim()) continue;
+          // Fast substring check before full parse
+          if (line.includes('"role":"user"') || line.includes('"role": "user"')) {
+            count++;
+            if (count > 0) return true;
+          }
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    })();
+    const skipContextInjection = contextInjectionMode === "first-message-only" && hasUserMessages;
 
     const { bootstrapFiles: hookAdjustedBootstrapFiles, contextFiles: rawContextFiles } =
       await resolveBootstrapContextForRun({
