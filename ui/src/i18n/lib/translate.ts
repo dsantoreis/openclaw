@@ -33,6 +33,9 @@ class I18nManager {
     if (navLang.startsWith("de")) {
       return "de";
     }
+    if (navLang.startsWith("nl")) {
+      return "nl";
+    }
     return "en";
   }
 
@@ -69,6 +72,8 @@ class I18nManager {
           module = await import("../locales/pt-BR.ts");
         } else if (locale === "de") {
           module = await import("../locales/de.ts");
+        } else if (locale === "nl") {
+          module = await import("../locales/nl.ts");
         } else {
           return;
         }
