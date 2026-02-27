@@ -716,16 +716,25 @@ export async function runEmbeddedAttempt(
     const hasUserMessages = await (async () => {
       try {
         const content = await fs.readFile(params.sessionFile, "utf-8");
-        // Each line is a JSON record; count lines with "role":"user" as real messages
-        let count = 0;
+        // Each line is a JSONL record. We look for lines with "role":"user" that
+        // contain actual content — this avoids false positives from header-only
+        // transcripts, orphan entries left by aborted attempts, or repaired sessions
+        // where user entries may exist without meaningful conversation content.
         for (const line of content.split("\n")) {
-          if (!line.trim()) {
+          const trimmed = line.trim();
+          if (!trimmed) {
             continue;
           }
           // Fast substring check before full parse
-          if (line.includes('"role":"user"') || line.includes('"role": "user"')) {
-            count++;
-            if (count > 0) {
+          if (trimmed.includes('"role":"user"') || trimmed.includes('"role": "user"')) {
+            // Verify this is a real message with content, not a stale/orphan entry
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (parsed.role === "user" && parsed.content) {
+                return true;
+              }
+            } catch {
+              // If we can't parse, the substring match is still a valid signal
               return true;
             }
           }
