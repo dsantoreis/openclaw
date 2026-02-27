@@ -136,9 +136,10 @@ function redactApiKeysForPersistence(
     }
     const apiKey = (entry as Record<string, unknown>).apiKey;
     if (typeof apiKey === "string" && apiKey.trim() && !ENV_VAR_NAME_RE.test(apiKey.trim())) {
-      // This apiKey is a resolved secret (not an env var name) — omit it.
-      const { apiKey: _stripped, ...rest } = entry as Record<string, unknown>;
-      redacted[key] = rest as ProviderConfig;
+      // This apiKey is a resolved secret (not an env var name) — replace with
+      // a placeholder so that ModelRegistry still sees an apiKey field (required
+      // for provider registration) while the actual value stays out of disk.
+      redacted[key] = { ...entry, apiKey: "REDACTED" } as ProviderConfig;
     } else {
       redacted[key] = entry;
     }
