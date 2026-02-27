@@ -50,7 +50,7 @@ export function renderSystemdUnavailableHints(options: { wsl?: boolean } = {}): 
     "",
     "On headless servers (EC2, VPS, etc.), run:",
     "  sudo loginctl enable-linger $(whoami)",
-    '  export XDG_RUNTIME_DIR=/run/user/$(id -u)  # add to ~/.bashrc for persistence',
+    "  export XDG_RUNTIME_DIR=/run/user/$(id -u)  # add to ~/.bashrc for persistence",
     "",
     `Then retry: ${formatCliCommand("openclaw gateway install --force")}`,
     "",
