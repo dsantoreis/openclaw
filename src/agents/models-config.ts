@@ -110,6 +110,42 @@ async function readJson(pathname: string): Promise<unknown> {
   }
 }
 
+/**
+ * ENV_VAR_NAME_RE matches strings that look like environment variable names
+ * (e.g. "OPENAI_API_KEY"). These are safe to persist in models.json because
+ * they are *references*, not the secret value itself.
+ */
+const ENV_VAR_NAME_RE = /^[A-Z][A-Z0-9_]{1,127}$/;
+
+/**
+ * Strip resolved secret values from provider entries before writing to disk.
+ * Keeps env var *names* (which are safe references) but removes anything that
+ * looks like a resolved API key or token.
+ */
+function redactApiKeysForPersistence(
+  providers: ModelsConfig["providers"],
+): ModelsConfig["providers"] {
+  if (!providers) {
+    return providers;
+  }
+  const redacted: Record<string, ProviderConfig> = {};
+  for (const [key, entry] of Object.entries(providers)) {
+    if (!entry) {
+      redacted[key] = entry;
+      continue;
+    }
+    const apiKey = (entry as Record<string, unknown>).apiKey;
+    if (typeof apiKey === "string" && apiKey.trim() && !ENV_VAR_NAME_RE.test(apiKey.trim())) {
+      // This apiKey is a resolved secret (not an env var name) — omit it.
+      const { apiKey: _stripped, ...rest } = entry as Record<string, unknown>;
+      redacted[key] = rest as ProviderConfig;
+    } else {
+      redacted[key] = entry;
+    }
+  }
+  return redacted;
+}
+
 export async function ensureOpenClawModelsJson(
   config?: OpenClawConfig,
   agentDirOverride?: string,
@@ -182,7 +218,14 @@ export async function ensureOpenClawModelsJson(
     providers: mergedProviders,
     agentDir,
   });
-  const next = `${JSON.stringify({ providers: normalizedProviders }, null, 2)}\n`;
+
+  // Security: strip resolved API keys from the persisted models.json.
+  // SecretRef values and environment variables are resolved to plaintext during
+  // normalization, but writing them to disk defeats at-rest secret protection.
+  // The runtime auth chain (profiles → env → config) can re-resolve keys on
+  // demand, so models.json only needs env var *names* (not values).
+  const redactedProviders = redactApiKeysForPersistence(normalizedProviders);
+  const next = `${JSON.stringify({ providers: redactedProviders }, null, 2)}\n`;
   try {
     existingRaw = await fs.readFile(targetPath, "utf8");
   } catch {
