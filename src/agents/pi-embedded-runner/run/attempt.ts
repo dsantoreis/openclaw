@@ -731,7 +731,11 @@ export async function runEmbeddedAttempt(
                 if (trimmed.includes('"role":"user"') || trimmed.includes('"role": "user"')) {
                   try {
                     const parsed = JSON.parse(trimmed);
-                    if (parsed.role === "user" && parsed.content) {
+                    // Session JSONL records can have top-level role (legacy) or
+                    // nested message.role structure (current format).
+                    const role = parsed.role ?? parsed.message?.role;
+                    const content = parsed.content ?? parsed.message?.content;
+                    if (role === "user" && content) {
                       return true;
                     }
                   } catch {
