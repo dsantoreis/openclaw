@@ -14,7 +14,10 @@ import {
   truncateText,
   type ExtractMode,
 } from "./web-fetch-utils.js";
-import { fetchWithWebToolsNetworkGuard } from "./web-guarded-fetch.js";
+import {
+  fetchWithWebToolsNetworkGuard,
+  WEB_TOOLS_TRUSTED_NETWORK_SSRF_POLICY,
+} from "./web-guarded-fetch.js";
 import {
   CacheEntry,
   DEFAULT_CACHE_TTL_MINUTES,
@@ -524,6 +527,7 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string
   let finalUrl = params.url;
   try {
     const result = await fetchWithWebToolsNetworkGuard({
+      policy: WEB_TOOLS_TRUSTED_NETWORK_SSRF_POLICY,
       url: params.url,
       maxRedirects: params.maxRedirects,
       timeoutSeconds: params.timeoutSeconds,
