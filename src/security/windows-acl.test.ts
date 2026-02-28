@@ -432,3 +432,64 @@ Successfully processed 1 files`;
     });
   });
 });
+
+// Tests for localized Windows principal names (issue #29681)
+describe("localized principal names", () => {
+  it("classifies French AUTORITE NT\\Système as trusted", () => {
+    const entries: WindowsAclEntry[] = [
+      aclEntry({ principal: "AUTORITE NT\\Système" }),
+    ];
+    const summary = summarizeWindowsAcl(entries);
+    expect(summary.trusted).toHaveLength(1);
+    expect(summary.untrustedWorld).toHaveLength(0);
+    expect(summary.untrustedGroup).toHaveLength(0);
+  });
+
+  it("classifies French Builtin\\Administrateurs as trusted", () => {
+    const entries: WindowsAclEntry[] = [
+      aclEntry({ principal: "BUILTIN\\Administrateurs" }),
+    ];
+    const summary = summarizeWindowsAcl(entries);
+    expect(summary.trusted).toHaveLength(1);
+    expect(summary.untrustedGroup).toHaveLength(0);
+  });
+
+  it("classifies German NT-AUTORITÄT\\SYSTEM as trusted", () => {
+    const entries: WindowsAclEntry[] = [
+      aclEntry({ principal: "NT-AUTORITÄT\\SYSTEM" }),
+    ];
+    const summary = summarizeWindowsAcl(entries);
+    expect(summary.trusted).toHaveLength(1);
+    expect(summary.untrustedGroup).toHaveLength(0);
+  });
+
+  it("classifies French Tout le monde as world", () => {
+    const entries: WindowsAclEntry[] = [
+      aclEntry({ principal: "Tout le monde" }),
+    ];
+    const summary = summarizeWindowsAcl(entries);
+    expect(summary.untrustedWorld).toHaveLength(1);
+    expect(summary.trusted).toHaveLength(0);
+  });
+
+  it("classifies German Jeder as world", () => {
+    const entries: WindowsAclEntry[] = [
+      aclEntry({ principal: "Jeder" }),
+    ];
+    const summary = summarizeWindowsAcl(entries);
+    expect(summary.untrustedWorld).toHaveLength(1);
+    expect(summary.trusted).toHaveLength(0);
+  });
+
+  it("full French scenario: AUTORITE NT\\Système + user only → no untrusted", () => {
+    const entries: WindowsAclEntry[] = [
+      aclEntry({ principal: "AUTORITE NT\\Système" }),
+      aclEntry({ principal: "DESKTOP-ABC\\Pierre" }),
+    ];
+    const env = { USERNAME: "Pierre", USERDOMAIN: "DESKTOP-ABC" };
+    const summary = summarizeWindowsAcl(entries, env);
+    expect(summary.trusted).toHaveLength(2);
+    expect(summary.untrustedWorld).toHaveLength(0);
+    expect(summary.untrustedGroup).toHaveLength(0);
+  });
+});

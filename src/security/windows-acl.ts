@@ -27,15 +27,48 @@ const WORLD_PRINCIPALS = new Set([
   "builtin\\users",
   "authenticated users",
   "nt authority\\authenticated users",
+  // French (fr-FR)
+  "tout le monde",
+  "utilisateurs",
+  "builtin\\utilisateurs",
+  "utilisateurs authentifiés",
+  "autorite nt\\utilisateurs authentifiés",
+  // German (de-DE)
+  "jeder",
+  "benutzer",
+  "builtin\\benutzer",
+  "authentifizierte benutzer",
+  "nt-autorität\\authentifizierte benutzer",
+  // Spanish (es-ES)
+  "usuarios",
+  "builtin\\usuarios",
+  "usuarios autentificados",
+  "nt authority\\usuarios autentificados",
 ]);
 const TRUSTED_BASE = new Set([
   "nt authority\\system",
   "system",
   "builtin\\administrators",
   "creator owner",
+  // French (fr-FR)
+  "autorite nt\\système",
+  "système",
+  "builtin\\administrateurs",
+  // German (de-DE)
+  "nt-autorität\\system",
+  "builtin\\administratoren",
+  // Spanish (es-ES)
+  "nt authority\\sistema",
+  "sistema",
+  "builtin\\administradores",
+  // Italian (it-IT)
+  "builtin\\amministratori",
+  // Portuguese (pt-BR/pt-PT)
+  "autoridade nt\\system",
+  "builtin\\administradores",
 ]);
-const WORLD_SUFFIXES = ["\\users", "\\authenticated users"];
-const TRUSTED_SUFFIXES = ["\\administrators", "\\system"];
+const WORLD_SUFFIXES = ["\\users", "\\authenticated users", "\\utilisateurs", "\\benutzer", "\\usuarios"];
+const TRUSTED_SUFFIXES = ["\\administrators", "\\system", "\\système", "\\administrateurs", "\\administratoren", "\\administradores", "\\amministratori"];
 
 const SID_RE = /^s-\d+-\d+(-\d+)+$/i;
 const TRUSTED_SIDS = new Set([
