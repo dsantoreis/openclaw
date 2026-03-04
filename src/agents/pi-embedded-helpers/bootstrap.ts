@@ -114,6 +114,47 @@ export function resolveContextInjection(cfg?: OpenClawConfig): ContextInjectionM
   return "always";
 }
 
+export async function sessionHasUserMessages(sessionFile: string): Promise<boolean> {
+  try {
+    const content = await fs.readFile(sessionFile, "utf-8");
+    // Each line is a JSONL record. We only treat a line as prior user history
+    // when it parses and contains a user role with non-empty content.
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+      if (!trimmed.includes('"role":"user"') && !trimmed.includes('"role": "user"')) {
+        continue;
+      }
+      try {
+        const parsed = JSON.parse(trimmed) as {
+          role?: unknown;
+          content?: unknown;
+          message?: { role?: unknown; content?: unknown };
+        };
+        const role = parsed.role ?? parsed.message?.role;
+        const messageContent = parsed.content ?? parsed.message?.content;
+        if (role !== "user") {
+          continue;
+        }
+        if (typeof messageContent === "string" && messageContent.trim().length > 0) {
+          return true;
+        }
+        if (Array.isArray(messageContent) && messageContent.length > 0) {
+          return true;
+        }
+      } catch {
+        // Ignore malformed lines; do not treat parse failures as prior history.
+        continue;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function resolveBootstrapTotalMaxChars(cfg?: OpenClawConfig): number {
   const raw = cfg?.agents?.defaults?.bootstrapTotalMaxChars;
   if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {

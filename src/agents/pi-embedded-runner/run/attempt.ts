@@ -59,7 +59,10 @@ import {
   validateAnthropicTurns,
   validateGeminiTurns,
 } from "../../pi-embedded-helpers.js";
-import { resolveContextInjection } from "../../pi-embedded-helpers/bootstrap.js";
+import {
+  resolveContextInjection,
+  sessionHasUserMessages,
+} from "../../pi-embedded-helpers/bootstrap.js";
 import { subscribeEmbeddedPiSession } from "../../pi-embedded-subscribe.js";
 import { createPreparedEmbeddedPiSettingsManager } from "../../pi-project-settings.js";
 import { toClientToolDefinitions } from "../../pi-tool-definition-adapter.js";
@@ -717,40 +720,7 @@ export async function runEmbeddedAttempt(
     // avoids unnecessary O(n) I/O in the default "always" mode.
     const hasUserMessages =
       contextInjectionMode === "first-message-only"
-        ? await (async () => {
-            try {
-              const content = await fs.readFile(params.sessionFile, "utf-8");
-              // Each line is a JSONL record. We look for lines with "role":"user"
-              // that contain actual content — this avoids false positives from
-              // header-only transcripts, orphan entries, or repaired sessions.
-              for (const line of content.split("\n")) {
-                const trimmed = line.trim();
-                if (!trimmed) {
-                  continue;
-                }
-                if (trimmed.includes('"role":"user"') || trimmed.includes('"role": "user"')) {
-                  try {
-                    const parsed = JSON.parse(trimmed);
-                    // Session JSONL records can have top-level role (legacy) or
-                    // nested message.role structure (current format).
-                    const role = parsed.role ?? parsed.message?.role;
-                    const content = parsed.content ?? parsed.message?.content;
-                    if (role === "user" && content) {
-                      return true;
-                    }
-                  } catch {
-                    // Parse failure on a corrupted line — skip rather than
-                    // treating as a positive signal (avoids disabling context
-                    // injection due to transient file corruption).
-                    continue;
-                  }
-                }
-              }
-              return false;
-            } catch {
-              return false;
-            }
-          })()
+        ? await sessionHasUserMessages(params.sessionFile)
         : false;
     const skipContextInjection = contextInjectionMode === "first-message-only" && hasUserMessages;
 

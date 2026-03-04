@@ -36,6 +36,8 @@ import { ensureOpenClawModelsJson } from "../models-config.js";
 import { resolveOwnerDisplaySetting } from "../owner-display.js";
 import {
   ensureSessionHeader,
+  resolveContextInjection,
+  sessionHasUserMessages,
   validateAnthropicTurns,
   validateGeminiTurns,
 } from "../pi-embedded-helpers.js";
@@ -355,13 +357,20 @@ export async function compactEmbeddedPiSessionDirect(
     });
 
     const sessionLabel = params.sessionKey ?? params.sessionId;
-    const { contextFiles } = await resolveBootstrapContextForRun({
+    const contextInjectionMode = resolveContextInjection(params.config);
+    const hasUserMessages =
+      contextInjectionMode === "first-message-only"
+        ? await sessionHasUserMessages(params.sessionFile)
+        : false;
+    const skipContextInjection = contextInjectionMode === "first-message-only" && hasUserMessages;
+    const { contextFiles: rawContextFiles } = await resolveBootstrapContextForRun({
       workspaceDir: effectiveWorkspace,
       config: params.config,
       sessionKey: params.sessionKey,
       sessionId: params.sessionId,
       warn: makeBootstrapWarn({ sessionLabel, warn: (message) => log.warn(message) }),
     });
+    const contextFiles = skipContextInjection ? [] : rawContextFiles;
     const runAbortController = new AbortController();
     const toolsRaw = createOpenClawCodingTools({
       exec: {
