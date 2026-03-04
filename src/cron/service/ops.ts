@@ -109,7 +109,18 @@ export async function start(state: CronServiceState) {
     await persist(state);
   });
 
-  await runMissedJobs(state, { skipJobIds: startupInterruptedJobIds });
+  await locked(state, async () => {
+    await ensureLoaded(state, { forceReload: true, skipRecompute: true });
+  });
+
+  const skipInterruptedOneShotJobIds = new Set<string>();
+  for (const job of state.store?.jobs ?? []) {
+    if (startupInterruptedJobIds.has(job.id) && job.schedule.kind === "at") {
+      skipInterruptedOneShotJobIds.add(job.id);
+    }
+  }
+
+  await runMissedJobs(state, { skipJobIds: skipInterruptedOneShotJobIds });
 
   await locked(state, async () => {
     await ensureLoaded(state, { forceReload: true, skipRecompute: true });

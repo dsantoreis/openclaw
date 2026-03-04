@@ -81,7 +81,7 @@ describe("CronService restart catch-up", () => {
     await store.cleanup();
   });
 
-  it("clears stale running markers without replaying interrupted startup jobs", async () => {
+  it("replays interrupted recurring jobs on startup after clearing stale running markers", async () => {
     const store = await makeStorePath();
     const enqueueSystemEvent = vi.fn();
     const requestHeartbeatNow = vi.fn();
@@ -115,7 +115,11 @@ describe("CronService restart catch-up", () => {
 
     await cron.start();
 
-    expect(enqueueSystemEvent).not.toHaveBeenCalled();
+    expect(enqueueSystemEvent).toHaveBeenCalledWith(
+      "resume stale marker",
+      expect.objectContaining({ agentId: undefined }),
+    );
+    expect(requestHeartbeatNow).toHaveBeenCalled();
     expect(noopLogger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ jobId: "restart-stale-running" }),
       "cron: clearing stale running marker on startup",
@@ -124,9 +128,54 @@ describe("CronService restart catch-up", () => {
     const jobs = await cron.list({ includeDisabled: true });
     const updated = jobs.find((job) => job.id === "restart-stale-running");
     expect(updated?.state.runningAtMs).toBeUndefined();
-    expect(updated?.state.lastStatus).toBeUndefined();
-    expect(updated?.state.lastRunAtMs).toBeUndefined();
+    expect(updated?.state.lastStatus).toBe("ok");
+    expect(updated?.state.lastRunAtMs).toBe(Date.parse("2025-12-13T17:00:00.000Z"));
     expect((updated?.state.nextRunAtMs ?? 0) > Date.parse("2025-12-13T17:00:00.000Z")).toBe(true);
+
+    cron.stop();
+    await store.cleanup();
+  });
+
+  it("does not replay interrupted one-shot jobs on startup", async () => {
+    const store = await makeStorePath();
+    const enqueueSystemEvent = vi.fn();
+    const requestHeartbeatNow = vi.fn();
+
+    const dueAt = Date.parse("2025-12-13T16:00:00.000Z");
+    const staleRunningAt = Date.parse("2025-12-13T16:30:00.000Z");
+
+    await writeStoreJobs(store.storePath, [
+      {
+        id: "restart-stale-one-shot",
+        name: "one shot stale marker",
+        enabled: true,
+        createdAtMs: Date.parse("2025-12-10T12:00:00.000Z"),
+        updatedAtMs: Date.parse("2025-12-13T16:30:00.000Z"),
+        schedule: { kind: "at", atIso: "2025-12-13T16:00:00.000Z" },
+        sessionTarget: "main",
+        wakeMode: "next-heartbeat",
+        payload: { kind: "systemEvent", text: "one-shot stale marker" },
+        state: {
+          nextRunAtMs: dueAt,
+          runningAtMs: staleRunningAt,
+        },
+      },
+    ]);
+
+    const cron = createRestartCronService({
+      storePath: store.storePath,
+      enqueueSystemEvent,
+      requestHeartbeatNow,
+    });
+
+    await cron.start();
+
+    expect(enqueueSystemEvent).not.toHaveBeenCalled();
+    expect(requestHeartbeatNow).not.toHaveBeenCalled();
+
+    const jobs = await cron.list({ includeDisabled: true });
+    const updated = jobs.find((job) => job.id === "restart-stale-one-shot");
+    expect(updated?.state.runningAtMs).toBeUndefined();
 
     cron.stop();
     await store.cleanup();
