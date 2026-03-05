@@ -91,6 +91,39 @@ describe("resolveIMessageInboundDecision sender fallback", () => {
     expect(decision).toEqual({ kind: "drop", reason: "missing sender" });
   });
 
+  it("trims whitespace on reply_to_sender fallback", () => {
+    const decision = resolveIMessageInboundDecision({
+      cfg,
+      accountId: "default",
+      message: {
+        id: 770,
+        sender: "",
+        reply_to_sender: "  +15555550009  ",
+        text: "hello",
+        is_from_me: false,
+        is_group: false,
+      },
+      opts: undefined,
+      messageText: "hello",
+      bodyText: "hello",
+      allowFrom: [],
+      groupAllowFrom: [],
+      groupPolicy: "open",
+      dmPolicy: "open",
+      storeAllowFrom: [],
+      historyLimit: 0,
+      groupHistories: new Map(),
+      echoCache: undefined,
+      logVerbose: undefined,
+    });
+
+    expect(decision.kind).toBe("dispatch");
+    if (decision.kind !== "dispatch") {
+      return;
+    }
+    expect(decision.sender).toBe("+15555550009");
+  });
+
   it("uses single participant as group sender fallback when sender is missing", () => {
     const decision = resolveIMessageInboundDecision({
       cfg,
