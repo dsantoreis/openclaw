@@ -261,10 +261,11 @@ describe("registerTelegramNativeCommands — session metadata", () => {
     expect(persistentBindingMocks.ensureConfiguredAcpBindingSession).toHaveBeenCalledTimes(1);
     const dispatchCall = (
       replyMocks.dispatchReplyWithBufferedBlockDispatcher.mock.calls as unknown as Array<
-        [{ ctx?: { CommandTargetSessionKey?: string } }]
+        [{ ctx?: { CommandTargetSessionKey?: string; OriginatingTo?: string } }]
       >
     )[0]?.[0];
     expect(dispatchCall?.ctx?.CommandTargetSessionKey).toBe(boundSessionKey);
+    expect(dispatchCall?.ctx?.OriginatingTo).toBe("telegram:group:-1001234567890:topic:42");
   });
 
   it("aborts native command dispatch when configured ACP topic binding cannot initialize", async () => {
