@@ -86,10 +86,6 @@ export type IMessageInboundDecision =
   | IMessageInboundDispatchDecision;
 
 function resolveFallbackSender(message: IMessagePayload): string {
-  const replyToSender = (message.reply_to_sender ?? "").trim();
-  if (replyToSender) {
-    return replyToSender;
-  }
   if (!message.is_group) {
     return "";
   }

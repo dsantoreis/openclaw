@@ -62,7 +62,7 @@ describe("describeIMessageEchoDropLog", () => {
 describe("resolveIMessageInboundDecision sender fallback", () => {
   const cfg = {} as OpenClawConfig;
 
-  it("uses reply_to_sender when sender is missing", () => {
+  it("does not use reply_to_sender as sender fallback", () => {
     const decision = resolveIMessageInboundDecision({
       cfg,
       accountId: "default",
@@ -88,11 +88,7 @@ describe("resolveIMessageInboundDecision sender fallback", () => {
       logVerbose: undefined,
     });
 
-    expect(decision.kind).toBe("dispatch");
-    if (decision.kind !== "dispatch") {
-      return;
-    }
-    expect(decision.sender).toBe("+15555550001");
+    expect(decision).toEqual({ kind: "drop", reason: "missing sender" });
   });
 
   it("uses single participant as group sender fallback when sender is missing", () => {
@@ -104,7 +100,7 @@ describe("resolveIMessageInboundDecision sender fallback", () => {
         sender: "",
         participants: ["+15555550002"],
         text: "group msg",
-        chat_id: "chat-1",
+        chat_id: 1,
         is_from_me: false,
         is_group: true,
       },
@@ -138,7 +134,7 @@ describe("resolveIMessageInboundDecision sender fallback", () => {
         sender: "",
         participants: ["+15555550002", "+15555550003"],
         text: "group msg",
-        chat_id: "chat-1",
+        chat_id: 1,
         is_from_me: false,
         is_group: true,
       },
