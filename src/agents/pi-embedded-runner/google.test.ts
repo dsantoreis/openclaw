@@ -24,23 +24,26 @@ describe("sanitizeToolsForGoogle", () => {
     expect(params.properties?.foo?.format).toBeUndefined();
   };
 
-  it("strips unsupported schema keywords for Google providers", () => {
-    const tool = createTool({
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        foo: {
-          type: "string",
-          format: "uuid",
+  it.each(["google-gemini-cli", "google"])(
+    "strips unsupported schema keywords for %s provider",
+    (provider) => {
+      const tool = createTool({
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          foo: {
+            type: "string",
+            format: "uuid",
+          },
         },
-      },
-    });
-    const [sanitized] = sanitizeToolsForGoogle({
-      tools: [tool],
-      provider: "google-gemini-cli",
-    });
-    expectFormatRemoved(sanitized, "additionalProperties");
-  });
+      });
+      const [sanitized] = sanitizeToolsForGoogle({
+        tools: [tool],
+        provider,
+      });
+      expectFormatRemoved(sanitized, "additionalProperties");
+    },
+  );
 
   it("returns original tools for non-google providers", () => {
     const tool = createTool({
