@@ -27,6 +27,8 @@ const MAX_SEARCH_COUNT = 10;
 
 const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
 const PERPLEXITY_SEARCH_ENDPOINT = "https://api.perplexity.ai/search";
+const DEFAULT_PERPLEXITY_BASE_URL = "https://api.perplexity.ai";
+const DEFAULT_PERPLEXITY_MODEL = "perplexity/sonar-pro";
 
 const XAI_API_ENDPOINT = "https://api.x.ai/v1/responses";
 const DEFAULT_GROK_MODEL = "grok-4-1-fast";
@@ -189,6 +191,8 @@ type BraveSearchResponse = {
 
 type PerplexityConfig = {
   apiKey?: string;
+  baseUrl?: string;
+  model?: string;
 };
 
 type PerplexityApiKeySource = "config" | "perplexity_env" | "none";
@@ -516,6 +520,18 @@ function resolvePerplexityApiKey(perplexity?: PerplexityConfig): {
   }
 
   return { apiKey: undefined, source: "none" };
+}
+
+function resolvePerplexityBaseUrl(perplexity?: PerplexityConfig): string {
+  const configured =
+    perplexity && typeof perplexity.baseUrl === "string" ? perplexity.baseUrl.trim() : "";
+  return (configured || DEFAULT_PERPLEXITY_BASE_URL).replace(/\/$/, "");
+}
+
+function resolvePerplexityModel(perplexity?: PerplexityConfig): string {
+  const configured =
+    perplexity && typeof perplexity.model === "string" ? perplexity.model.trim() : "";
+  return configured || DEFAULT_PERPLEXITY_MODEL;
 }
 
 function normalizeApiKey(key: unknown): string {
@@ -868,9 +884,64 @@ async function runPerplexitySearchApi(params: {
   searchBeforeDate?: string;
   maxTokens?: number;
   maxTokensPerPage?: number;
+  baseUrl?: string;
+  model?: string;
 }): Promise<
   Array<{ title: string; url: string; description: string; published?: string; siteName?: string }>
 > {
+  const baseUrl = params.baseUrl?.trim().replace(/\/$/, "") || DEFAULT_PERPLEXITY_BASE_URL;
+  const useChatCompletions = !baseUrl.includes("api.perplexity.ai");
+
+  if (useChatCompletions) {
+    const endpoint = `${baseUrl}/chat/completions`;
+    return await withTrustedWebSearchEndpoint(
+      {
+        url: endpoint,
+        timeoutSeconds: params.timeoutSeconds,
+        init: {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${params.apiKey}`,
+            "HTTP-Referer": "https://openclaw.ai",
+            "X-Title": "OpenClaw Web Search",
+          },
+          body: JSON.stringify({
+            model: params.model || DEFAULT_PERPLEXITY_MODEL,
+            messages: [{ role: "user", content: params.query }],
+          }),
+        },
+      },
+      async (res) => {
+        if (!res.ok) {
+          return await throwWebSearchApiError(res, "Perplexity Search");
+        }
+        const data = (await res.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+          citations?: string[];
+        };
+        const text = data.choices?.[0]?.message?.content?.trim() || "";
+        const citations = (data.citations ?? []).filter(
+          (citation): citation is string =>
+            typeof citation === "string" && citation.trim().length > 0,
+        );
+        if (!text) {
+          return [];
+        }
+        const firstCitation = citations[0] ?? "";
+        return [
+          {
+            title: wrapWebContent("Perplexity Search", "web_search"),
+            url: firstCitation,
+            description: wrapWebContent(text, "web_search"),
+            siteName: resolveSiteName(firstCitation) || undefined,
+          },
+        ];
+      },
+    );
+  }
+
   const body: Record<string, unknown> = {
     query: params.query,
     max_results: params.count,
@@ -1166,6 +1237,8 @@ async function runWebSearch(params: {
   searchDomainFilter?: string[];
   maxTokens?: number;
   maxTokensPerPage?: number;
+  perplexityBaseUrl?: string;
+  perplexityModel?: string;
   grokModel?: string;
   grokInlineCitations?: boolean;
   geminiModel?: string;
@@ -1204,6 +1277,8 @@ async function runWebSearch(params: {
       searchBeforeDate: params.dateBefore ? isoToPerplexityDate(params.dateBefore) : undefined,
       maxTokens: params.maxTokens,
       maxTokensPerPage: params.maxTokensPerPage,
+      baseUrl: params.perplexityBaseUrl,
+      model: params.perplexityModel,
     });
 
     const payload = {
@@ -1591,6 +1666,8 @@ export function createWebSearchTool(options?: {
         searchDomainFilter: domainFilter,
         maxTokens: maxTokens ?? undefined,
         maxTokensPerPage: maxTokensPerPage ?? undefined,
+        perplexityBaseUrl: resolvePerplexityBaseUrl(perplexityConfig),
+        perplexityModel: resolvePerplexityModel(perplexityConfig),
         grokModel: resolveGrokModel(grokConfig),
         grokInlineCitations: resolveGrokInlineCitations(grokConfig),
         geminiModel: resolveGeminiModel(geminiConfig),
