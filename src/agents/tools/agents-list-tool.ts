@@ -46,7 +46,9 @@ export function createAgentsListTool(opts?: {
           DEFAULT_AGENT_ID,
       );
 
-      const allowAgents = resolveAgentConfig(cfg, requesterAgentId)?.subagents?.allowAgents ?? [];
+      const requesterAgentCfg = resolveAgentConfig(cfg, requesterAgentId);
+      const explicitAllowAgents = requesterAgentCfg?.subagents?.allowAgents;
+      const allowAgents = explicitAllowAgents ?? [];
       const allowAny = allowAgents.some((value) => value.trim() === "*");
       const allowSet = new Set(
         allowAgents
@@ -68,6 +70,10 @@ export function createAgentsListTool(opts?: {
       const allowed = new Set<string>();
       allowed.add(requesterAgentId);
       if (allowAny) {
+        for (const id of configuredIds) {
+          allowed.add(id);
+        }
+      } else if (explicitAllowAgents === undefined) {
         for (const id of configuredIds) {
           allowed.add(id);
         }
