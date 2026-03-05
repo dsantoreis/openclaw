@@ -19,6 +19,18 @@ describe("buildTelegramMessageContext multi-account defaults", () => {
   it("routes non-default account DMs without relying on account enabled flags", async () => {
     const ctx = await buildTelegramMessageContextForTest({
       accountId: "jarvis2",
+      cfg: {
+        agents: { defaults: { model: "anthropic/claude-opus-4-5", workspace: "/tmp/openclaw" } },
+        channels: {
+          telegram: {
+            accounts: {
+              default: { enabled: false },
+              jarvis2: { enabled: true },
+            },
+          },
+        },
+        messages: { groupChat: { mentionPatterns: [] } },
+      },
       message: {
         chat: { id: 99_002, type: "private" },
         from: { id: 42, first_name: "Guido" },
