@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildTelegramMessageContextForTest } from "./bot-message-context.test-harness.js";
 
 describe("buildTelegramMessageContext multi-account defaults", () => {
-  it("processes inbound DMs for non-default accounts without explicit bindings", async () => {
+  it("drops inbound DMs for non-default accounts without explicit bindings", async () => {
     const ctx = await buildTelegramMessageContextForTest({
       accountId: "jarvis2",
       message: {
@@ -12,11 +12,10 @@ describe("buildTelegramMessageContext multi-account defaults", () => {
       },
     });
 
-    expect(ctx).not.toBeNull();
-    expect(ctx?.route.accountId).toBe("jarvis2");
+    expect(ctx).toBeNull();
   });
 
-  it("routes non-default account DMs without relying on account enabled flags", async () => {
+  it("still blocks when account enabled flags are absent", async () => {
     const ctx = await buildTelegramMessageContextForTest({
       accountId: "jarvis2",
       message: {
@@ -26,7 +25,6 @@ describe("buildTelegramMessageContext multi-account defaults", () => {
       },
     });
 
-    expect(ctx).not.toBeNull();
-    expect(ctx?.route.accountId).toBe("jarvis2");
+    expect(ctx).toBeNull();
   });
 });
