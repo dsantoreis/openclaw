@@ -84,6 +84,15 @@ export function formatErrorMessage(err: unknown): string {
   return redactSensitiveText(formatted);
 }
 
+export function isRecoverableTlsSessionNullDeref(err: unknown): boolean {
+  const text = formatUncaughtError(err).toLowerCase();
+  return (
+    text.includes("cannot read properties of null") &&
+    text.includes("setsession") &&
+    text.includes("_tls_wrap")
+  );
+}
+
 export function formatUncaughtError(err: unknown): string {
   if (extractErrorCode(err) === "INVALID_CONFIG") {
     return formatErrorMessage(err);
