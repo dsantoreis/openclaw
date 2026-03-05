@@ -48,7 +48,11 @@ import {
   resolveAgentRoute,
   type ResolvedAgentRoute,
 } from "../routing/resolve-route.js";
-import { buildAgentMainSessionKey, resolveThreadSessionKeys } from "../routing/session-key.js";
+import {
+  DEFAULT_ACCOUNT_ID,
+  buildAgentMainSessionKey,
+  resolveThreadSessionKeys,
+} from "../routing/session-key.js";
 import { resolvePinnedMainDmOwnerFromAllowlist } from "../security/dm-policy-shared.js";
 import { withTelegramApiErrorLogging } from "./api-logging.js";
 import {
