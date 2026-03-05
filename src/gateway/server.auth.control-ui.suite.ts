@@ -347,6 +347,31 @@ export function registerControlUiAndPairingSuite(): void {
     }
   });
 
+  test("ignores explicit wrong deviceToken when dangerouslyDisableDeviceAuth=true and shared token is valid", async () => {
+    testState.gatewayControlUi = { dangerouslyDisableDeviceAuth: true };
+    testState.gatewayAuth = { mode: "token", token: "secret" };
+    const prevToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+    process.env.OPENCLAW_GATEWAY_TOKEN = "secret";
+    try {
+      await withGatewayServer(async ({ port }) => {
+        const ws = await openWs(port, { origin: originForPort(port) });
+        const res = await connectReq(ws, {
+          token: "secret",
+          deviceToken: "stale-or-invalid-device-token",
+          scopes: ["operator.read"],
+          client: {
+            ...CONTROL_UI_CLIENT,
+          },
+        });
+        expect(res.ok).toBe(true);
+        expect(res.error?.message ?? "").not.toContain("device token mismatch");
+        ws.close();
+      });
+    } finally {
+      restoreGatewayToken(prevToken);
+    }
+  });
+
   test("device token auth matrix", async () => {
     const { server, ws, port, prevToken } = await startServerWithClient("secret");
     const { deviceToken, deviceIdentityPath } = await ensurePairedDeviceTokenForCurrentIdentity(ws);
