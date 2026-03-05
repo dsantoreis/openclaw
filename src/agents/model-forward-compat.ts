@@ -193,14 +193,14 @@ function resolveGoogleGeminiCli31ForwardCompatModel(
     return undefined;
   }
 
-  for (const candidateProvider of [normalizedProvider, "google-gemini-cli"]) {
+  for (const candidateProvider of new Set([normalizedProvider, "google-gemini-cli"])) {
     const cloned = cloneFirstTemplateModel({
       normalizedProvider: candidateProvider,
       trimmedModelId: trimmed,
       templateIds: [...templateIds],
       modelRegistry,
       patch: {
-        provider: normalizedProvider,
+        provider: candidateProvider,
         reasoning: true,
       },
     });
