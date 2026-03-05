@@ -21,12 +21,17 @@ export type TelegramGroupBaseAccessResult =
 
 function isGroupAllowOverrideAuthorized(params: {
   effectiveGroupAllow: NormalizedAllowFrom;
+  chatId?: string | number;
   senderId?: string;
   senderUsername?: string;
   requireSenderForAllowOverride: boolean;
 }): boolean {
   if (!params.effectiveGroupAllow.hasEntries) {
     return false;
+  }
+  const chatId = params.chatId != null ? String(params.chatId) : "";
+  if (chatId && params.effectiveGroupAllow.entries.includes(chatId)) {
+    return true;
   }
   const senderId = params.senderId ?? "";
   if (params.requireSenderForAllowOverride && !senderId) {
@@ -41,6 +46,7 @@ function isGroupAllowOverrideAuthorized(params: {
 
 export const evaluateTelegramGroupBaseAccess = (params: {
   isGroup: boolean;
+  chatId?: string | number;
   groupConfig?: TelegramGroupConfig | TelegramDirectConfig;
   topicConfig?: TelegramTopicConfig;
   hasGroupAllowOverride: boolean;
@@ -63,6 +69,7 @@ export const evaluateTelegramGroupBaseAccess = (params: {
       if (
         !isGroupAllowOverrideAuthorized({
           effectiveGroupAllow: params.effectiveGroupAllow,
+          chatId: params.chatId,
           senderId: params.senderId,
           senderUsername: params.senderUsername,
           requireSenderForAllowOverride: params.requireSenderForAllowOverride,
@@ -80,6 +87,7 @@ export const evaluateTelegramGroupBaseAccess = (params: {
   if (
     !isGroupAllowOverrideAuthorized({
       effectiveGroupAllow: params.effectiveGroupAllow,
+      chatId: params.chatId,
       senderId: params.senderId,
       senderUsername: params.senderUsername,
       requireSenderForAllowOverride: params.requireSenderForAllowOverride,
@@ -192,7 +200,9 @@ export const evaluateTelegramGroupPolicyAccess = (params: {
       return { allowed: true, groupPolicy };
     }
     const senderUsername = params.senderUsername ?? "";
+    const chatIdAllowed = params.effectiveGroupAllow.entries.includes(String(params.chatId));
     if (
+      !chatIdAllowed &&
       !isSenderAllowed({
         allow: params.effectiveGroupAllow,
         senderId,
