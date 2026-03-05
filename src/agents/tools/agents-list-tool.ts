@@ -73,10 +73,6 @@ export function createAgentsListTool(opts?: {
         for (const id of configuredIds) {
           allowed.add(id);
         }
-      } else if (explicitAllowAgents === undefined) {
-        for (const id of configuredIds) {
-          allowed.add(id);
-        }
       } else {
         for (const id of allowSet) {
           allowed.add(id);
