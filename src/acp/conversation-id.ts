@@ -19,11 +19,15 @@ export function parseTelegramChatIdFromTarget(raw: unknown): string | undefined 
   if (!text) {
     return undefined;
   }
-  const match = text.match(/^telegram:(-?\d+)$/);
-  if (!match?.[1]) {
-    return undefined;
+  const directMatch = text.match(/^telegram:(-?\d+)$/);
+  if (directMatch?.[1]) {
+    return directMatch[1];
   }
-  return match[1];
+  const groupMatch = text.match(/^telegram:group:(-?\d+)(?::topic:\d+)?$/);
+  if (groupMatch?.[1]) {
+    return groupMatch[1];
+  }
+  return undefined;
 }
 
 export function buildTelegramTopicConversationId(params: {
