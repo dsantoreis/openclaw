@@ -261,6 +261,8 @@ export async function runDiscordGatewayLifecycle(params: {
   }
 
   let sawDisallowedIntents = false;
+  let sawReconnectExhausted = false;
+  const isReconnectExhaustedError = (err: unknown) => /max reconnect attempts/i.test(String(err));
   const logGatewayError = (err: unknown) => {
     if (params.isDisallowedIntentsError(err)) {
       sawDisallowedIntents = true;
@@ -271,12 +273,21 @@ export async function runDiscordGatewayLifecycle(params: {
       );
       return;
     }
+    if (isReconnectExhaustedError(err)) {
+      sawReconnectExhausted = true;
+      params.runtime.error?.(
+        danger(
+          "discord gateway reconnect attempts exhausted; stopping Discord monitor without crashing the gateway",
+        ),
+      );
+      return;
+    }
     params.runtime.error?.(danger(`discord gateway error: ${String(err)}`));
   };
   const shouldStopOnGatewayError = (err: unknown) => {
     const message = String(err);
     return (
-      message.includes("Max reconnect attempts") ||
+      isReconnectExhaustedError(err) ||
       message.includes("Fatal Gateway error") ||
       params.isDisallowedIntentsError(err)
     );
@@ -323,7 +334,11 @@ export async function runDiscordGatewayLifecycle(params: {
       },
     });
   } catch (err) {
-    if (!sawDisallowedIntents && !params.isDisallowedIntentsError(err)) {
+    if (
+      !sawDisallowedIntents &&
+      !params.isDisallowedIntentsError(err) &&
+      !(sawReconnectExhausted && isReconnectExhaustedError(err))
+    ) {
       throw err;
     }
   } finally {

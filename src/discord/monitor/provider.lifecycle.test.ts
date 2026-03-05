@@ -276,6 +276,20 @@ describe("runDiscordGatewayLifecycle", () => {
     });
   });
 
+  it("handles queued reconnect exhaustion errors without crashing lifecycle", async () => {
+    const { runDiscordGatewayLifecycle } = await import("./provider.lifecycle.js");
+    const { lifecycleParams, runtimeError } = createLifecycleHarness({
+      pendingGatewayErrors: [
+        new Error("Uncaught exception: Error: max reconnect attempts (0) reached after code 1006"),
+      ],
+    });
+
+    await expect(runDiscordGatewayLifecycle(lifecycleParams)).resolves.toBeUndefined();
+    expect(runtimeError).toHaveBeenCalledWith(
+      expect.stringContaining("reconnect attempts exhausted"),
+    );
+  });
+
   it("retries stalled HELLO with resume before forcing fresh identify", async () => {
     vi.useFakeTimers();
     try {
