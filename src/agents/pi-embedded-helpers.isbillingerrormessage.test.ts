@@ -30,6 +30,7 @@ describe("isAuthPermanentErrorMessage", () => {
       "could not validate credentials",
       "API_KEY_REVOKED",
       "api_key_deleted",
+      "401 Unauthorized - Missing scopes: api.responses.write",
     ];
     for (const sample of samples) {
       expect(isAuthPermanentErrorMessage(sample)).toBe(true);
@@ -492,7 +493,7 @@ describe("classifyFailoverReason", () => {
     expect(classifyFailoverReason("You have insufficient permissions for this operation.")).toBe(
       "auth",
     );
-    expect(classifyFailoverReason("Missing scopes: model.request")).toBe("auth");
+    expect(classifyFailoverReason("Missing scopes: model.request")).toBe("auth_permanent");
     expect(classifyFailoverReason("429 too many requests")).toBe("rate_limit");
     expect(classifyFailoverReason("resource has been exhausted")).toBe("rate_limit");
     expect(

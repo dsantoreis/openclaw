@@ -53,6 +53,7 @@ const ERROR_PATTERNS = {
     /could not (?:authenticate|validate).*(?:api[_ ]?key|credentials)/i,
     "permission_error",
     "not allowed for this organization",
+    /missing scopes?:/i,
   ],
   auth: [
     /invalid[_ ]?api[_ ]?key/,
