@@ -599,7 +599,7 @@ describe("buildAgentSystemPrompt", () => {
       reasoningLevel: "off",
     });
 
-    expect(prompt).toContain("Reasoning: off");
+    expect(prompt).toContain("Reasoning: configured via runtime controls");
     expect(prompt).toContain("/reasoning");
     expect(prompt).toContain("/status shows Reasoning");
   });
