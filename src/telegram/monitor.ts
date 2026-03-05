@@ -103,7 +103,8 @@ const isGrammyHttpError = (err: unknown): boolean => {
 export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
   const log = opts.runtime?.error ?? console.error;
   let activeRunner: ReturnType<typeof run> | undefined;
-  let forceRestarted = false;
+  type ForcedRestartReason = "unhandled-network-error" | "stale-polling-watchdog";
+  let forcedRestartReason: ForcedRestartReason | null = null;
 
   // Register handler for Grammy HttpError unhandled rejections.
   // This catches network errors that escape the polling loop's try-catch
@@ -118,7 +119,7 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
     // Network failures can surface outside the runner task promise and leave
     // polling stuck; force-stop the active runner so the loop can recover.
     if (isNetworkError && activeRunner && activeRunner.isRunning()) {
-      forceRestarted = true;
+      forcedRestartReason = "unhandled-network-error";
       void activeRunner.stop().catch(() => {});
       log(
         `[telegram] Restarting polling after unhandled network error: ${formatErrorMessage(err)}`,
@@ -299,7 +300,7 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
           if (staleForMs < stallAfterMs) {
             return;
           }
-          forceRestarted = true;
+          forcedRestartReason = "stale-polling-watchdog";
           // Reset local timer to avoid repeated stop calls before restart loop runs.
           lastInboundAtMs = Date.now();
           void stopRunner();
@@ -328,16 +329,19 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
         if (opts.abortSignal?.aborted) {
           return "exit";
         }
-        const reason = forceRestarted
-          ? "unhandled network error"
-          : "runner stopped (maxRetryTime exceeded or graceful stop)";
-        forceRestarted = false;
+        const reason =
+          forcedRestartReason === "unhandled-network-error"
+            ? "unhandled network error"
+            : forcedRestartReason === "stale-polling-watchdog"
+              ? "stale polling watchdog"
+              : "runner stopped (maxRetryTime exceeded or graceful stop)";
+        forcedRestartReason = null;
         const shouldRestart = await waitBeforeRestart(
           (delay) => `Telegram polling runner stopped (${reason}); restarting in ${delay}.`,
         );
         return shouldRestart ? "continue" : "exit";
       } catch (err) {
-        forceRestarted = false;
+        forcedRestartReason = null;
         if (opts.abortSignal?.aborted) {
           throw err;
         }
