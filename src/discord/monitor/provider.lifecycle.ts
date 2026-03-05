@@ -261,12 +261,24 @@ export async function runDiscordGatewayLifecycle(params: {
   }
 
   let sawDisallowedIntents = false;
+  let sawReconnectExhausted = false;
+  const isReconnectExhaustedError = (err: unknown) =>
+    String(err).includes("Max reconnect attempts");
   const logGatewayError = (err: unknown) => {
     if (params.isDisallowedIntentsError(err)) {
       sawDisallowedIntents = true;
       params.runtime.error?.(
         danger(
           "discord: gateway closed with code 4014 (missing privileged gateway intents). Enable the required intents in the Discord Developer Portal or disable them in config.",
+        ),
+      );
+      return;
+    }
+    if (isReconnectExhaustedError(err)) {
+      sawReconnectExhausted = true;
+      params.runtime.error?.(
+        danger(
+          "discord gateway reconnect attempts exhausted; stopping Discord monitor without crashing the gateway",
         ),
       );
       return;
@@ -323,7 +335,11 @@ export async function runDiscordGatewayLifecycle(params: {
       },
     });
   } catch (err) {
-    if (!sawDisallowedIntents && !params.isDisallowedIntentsError(err)) {
+    if (
+      !sawDisallowedIntents &&
+      !params.isDisallowedIntentsError(err) &&
+      !(sawReconnectExhausted && isReconnectExhaustedError(err))
+    ) {
       throw err;
     }
   } finally {
