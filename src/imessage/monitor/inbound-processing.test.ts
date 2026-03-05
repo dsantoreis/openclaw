@@ -128,6 +128,36 @@ describe("resolveIMessageInboundDecision sender fallback", () => {
     }
     expect(decision.sender).toBe("+15555550002");
   });
+
+  it("keeps dropping ambiguous group sender when multiple participants exist", () => {
+    const decision = resolveIMessageInboundDecision({
+      cfg,
+      accountId: "default",
+      message: {
+        id: 79,
+        sender: "",
+        participants: ["+15555550002", "+15555550003"],
+        text: "group msg",
+        chat_id: "chat-1",
+        is_from_me: false,
+        is_group: true,
+      },
+      opts: undefined,
+      messageText: "group msg",
+      bodyText: "group msg",
+      allowFrom: [],
+      groupAllowFrom: [],
+      groupPolicy: "open",
+      dmPolicy: "open",
+      storeAllowFrom: [],
+      historyLimit: 0,
+      groupHistories: new Map(),
+      echoCache: undefined,
+      logVerbose: undefined,
+    });
+
+    expect(decision).toEqual({ kind: "drop", reason: "missing sender" });
+  });
 });
 
 describe("resolveIMessageInboundDecision command auth", () => {
