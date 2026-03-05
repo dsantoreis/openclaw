@@ -16,6 +16,7 @@ import type { SynologyWebhookPayload, ResolvedSynologyChatAccount } from "./type
 
 // One rate limiter per account, created lazily
 const rateLimiters = new Map<string, RateLimiter>();
+const SYNLOGY_CHAT_REPLY_CHUNK_MAX = 1800;
 
 function getRateLimiter(account: ResolvedSynologyChatAccount): RateLimiter {
   let rl = rateLimiters.get(account.accountId);
@@ -36,6 +37,37 @@ export function clearSynologyWebhookRateLimiterStateForTest(): void {
 
 export function getSynologyWebhookRateLimiterCountForTest(): number {
   return rateLimiters.size;
+}
+
+function splitReplyForSynologyChat(
+  text: string,
+  maxChars = SYNLOGY_CHAT_REPLY_CHUNK_MAX,
+): string[] {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  if (!normalized) {
+    return [];
+  }
+  if (normalized.length <= maxChars) {
+    return [normalized];
+  }
+
+  const chunks: string[] = [];
+  let remaining = normalized;
+  while (remaining.length > maxChars) {
+    let cut = remaining.lastIndexOf("\n", maxChars);
+    if (cut <= 0) {
+      cut = remaining.lastIndexOf(" ", maxChars);
+    }
+    if (cut <= 0) {
+      cut = maxChars;
+    }
+    chunks.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(cut).trimStart();
+  }
+  if (remaining.length > 0) {
+    chunks.push(remaining);
+  }
+  return chunks;
 }
 
 /** Read the full request body as a string. */
@@ -375,9 +407,16 @@ export function createWebhookHandler(deps: WebhookHandlerDeps) {
 
       // Send reply back to Synology Chat using the resolved Chat user_id
       if (reply) {
-        await sendMessage(account.incomingUrl, reply, replyUserId, account.allowInsecureSsl);
-        const replyPreview = reply.length > 100 ? `${reply.slice(0, 100)}...` : reply;
-        log?.info(`Reply sent to ${payload.username} (${replyUserId}): ${replyPreview}`);
+        const chunks = splitReplyForSynologyChat(reply);
+        for (const chunk of chunks) {
+          await sendMessage(account.incomingUrl, chunk, replyUserId, account.allowInsecureSsl);
+        }
+        const previewSource = chunks.join("\n");
+        const replyPreview =
+          previewSource.length > 100 ? `${previewSource.slice(0, 100)}...` : previewSource;
+        log?.info(
+          `Reply sent to ${payload.username} (${replyUserId}) in ${chunks.length} part(s): ${replyPreview}`,
+        );
       }
     } catch (err) {
       const errMsg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);

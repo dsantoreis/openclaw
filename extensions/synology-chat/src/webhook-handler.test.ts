@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { sendMessage } from "./client.js";
 import type { ResolvedSynologyChatAccount } from "./types.js";
 import {
   clearSynologyWebhookRateLimiterStateForTest,
@@ -424,5 +425,28 @@ describe("createWebhookHandler", () => {
         body: expect.stringContaining("[FILTERED]"),
       }),
     );
+  });
+
+  it("splits long replies into multiple Synology messages", async () => {
+    const sendMessageMock = vi.mocked(sendMessage);
+    const beforeCalls = sendMessageMock.mock.calls.length;
+
+    const deliver = vi.fn().mockResolvedValue(`${"A".repeat(1900)}\n${"B".repeat(1900)}`);
+    const handler = createWebhookHandler({
+      account: makeAccount({ accountId: "split-test-" + Date.now() }),
+      deliver,
+      log,
+    });
+
+    const req = makeReq("POST", validBody);
+    const res = makeRes();
+    await handler(req, res);
+
+    expect(res._status).toBe(204);
+    const calls = sendMessageMock.mock.calls.slice(beforeCalls);
+    expect(calls.length).toBeGreaterThan(1);
+    for (const call of calls) {
+      expect(String(call[1]).length).toBeLessThanOrEqual(1800);
+    }
   });
 });
