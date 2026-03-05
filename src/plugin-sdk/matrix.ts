@@ -94,3 +94,4 @@ export { formatResolvedUnresolvedNote } from "./resolution-notes.js";
 export { runPluginCommandWithTimeout } from "./run-command.js";
 export { createLoggerBackedRuntime } from "./runtime.js";
 export { buildProbeChannelStatusSummary } from "./status-helpers.js";
+export { KeyedAsyncQueue } from "./keyed-async-queue.js";
