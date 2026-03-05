@@ -162,6 +162,26 @@ describe("config schema", () => {
     expect(second).toBe(first);
   });
 
+  it("invalidates merged schema cache when plugin schema changes", () => {
+    const first = buildConfigSchema(cachedMergeInput);
+    const second = buildConfigSchema({
+      plugins: [
+        {
+          ...cachedMergeInput.plugins![0],
+          configSchema: {
+            ...(cachedMergeInput.plugins![0].configSchema as Record<string, unknown>),
+            properties: {
+              provider: { type: "string" },
+              region: { type: "string" },
+            },
+          },
+        },
+      ],
+      channels: [{ ...cachedMergeInput.channels![0] }],
+    });
+    expect(second).not.toBe(first);
+  });
+
   it("derives security/auth tags for credential paths", () => {
     const tags = deriveTagsForPath("gateway.auth.token");
     expect(tags).toContain("security");
