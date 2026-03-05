@@ -114,17 +114,20 @@ export function resolveContextInjection(cfg?: OpenClawConfig): ContextInjectionM
   return "always";
 }
 
-export async function sessionHasUserMessages(sessionFile: string): Promise<boolean> {
+async function sessionHasMessageRole(
+  sessionFile: string,
+  role: "user" | "assistant",
+): Promise<boolean> {
   try {
     const content = await fs.readFile(sessionFile, "utf-8");
-    // Each line is a JSONL record. We only treat a line as prior user history
-    // when it parses and contains a user role with non-empty content.
+    // Each line is a JSONL record. We only treat a line as prior history
+    // when it parses and contains the target role with non-empty content.
     for (const line of content.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) {
         continue;
       }
-      if (!trimmed.includes('"role":"user"') && !trimmed.includes('"role": "user"')) {
+      if (!trimmed.includes(`"role":"${role}"`) && !trimmed.includes(`"role": "${role}"`)) {
         continue;
       }
       try {
@@ -133,9 +136,9 @@ export async function sessionHasUserMessages(sessionFile: string): Promise<boole
           content?: unknown;
           message?: { role?: unknown; content?: unknown };
         };
-        const role = parsed.role ?? parsed.message?.role;
+        const parsedRole = parsed.role ?? parsed.message?.role;
         const messageContent = parsed.content ?? parsed.message?.content;
-        if (role !== "user") {
+        if (parsedRole !== role) {
           continue;
         }
         if (typeof messageContent === "string" && messageContent.trim().length > 0) {
@@ -153,6 +156,14 @@ export async function sessionHasUserMessages(sessionFile: string): Promise<boole
   } catch {
     return false;
   }
+}
+
+export async function sessionHasUserMessages(sessionFile: string): Promise<boolean> {
+  return sessionHasMessageRole(sessionFile, "user");
+}
+
+export async function sessionHasAssistantMessages(sessionFile: string): Promise<boolean> {
+  return sessionHasMessageRole(sessionFile, "assistant");
 }
 
 export function resolveBootstrapTotalMaxChars(cfg?: OpenClawConfig): number {

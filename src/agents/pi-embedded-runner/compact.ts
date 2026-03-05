@@ -37,7 +37,7 @@ import { resolveOwnerDisplaySetting } from "../owner-display.js";
 import {
   ensureSessionHeader,
   resolveContextInjection,
-  sessionHasUserMessages,
+  sessionHasAssistantMessages,
   validateAnthropicTurns,
   validateGeminiTurns,
 } from "../pi-embedded-helpers.js";
@@ -358,11 +358,12 @@ export async function compactEmbeddedPiSessionDirect(
 
     const sessionLabel = params.sessionKey ?? params.sessionId;
     const contextInjectionMode = resolveContextInjection(params.config);
-    const hasUserMessages =
+    const hasAssistantMessages =
       contextInjectionMode === "first-message-only"
-        ? await sessionHasUserMessages(params.sessionFile)
+        ? await sessionHasAssistantMessages(params.sessionFile)
         : false;
-    const skipContextInjection = contextInjectionMode === "first-message-only" && hasUserMessages;
+    const skipContextInjection =
+      contextInjectionMode === "first-message-only" && hasAssistantMessages;
     const { contextFiles: rawContextFiles } = await resolveBootstrapContextForRun({
       workspaceDir: effectiveWorkspace,
       config: params.config,

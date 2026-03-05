@@ -61,7 +61,7 @@ import {
 } from "../../pi-embedded-helpers.js";
 import {
   resolveContextInjection,
-  sessionHasUserMessages,
+  sessionHasAssistantMessages,
 } from "../../pi-embedded-helpers/bootstrap.js";
 import { subscribeEmbeddedPiSession } from "../../pi-embedded-subscribe.js";
 import { createPreparedEmbeddedPiSettingsManager } from "../../pi-project-settings.js";
@@ -711,18 +711,17 @@ export async function runEmbeddedAttempt(
     const sessionLabel = params.sessionKey ?? params.sessionId;
 
     // Check context injection mode: when "first-message-only", skip workspace context
-    // files on subsequent messages to reduce token usage (~93% savings over conversations).
-    // We count actual user messages in the session transcript rather than checking file
-    // existence, because pre-created, aborted, or repaired sessions can have a file
-    // without any real conversation history.
+    // only after a successful assistant turn exists in transcript state.
+    // This avoids false skips from stale/orphan user rows left by aborted runs.
     const contextInjectionMode = resolveContextInjection(params.config);
     // Only scan the transcript when "first-message-only" mode is active —
     // avoids unnecessary O(n) I/O in the default "always" mode.
-    const hasUserMessages =
+    const hasAssistantMessages =
       contextInjectionMode === "first-message-only"
-        ? await sessionHasUserMessages(params.sessionFile)
+        ? await sessionHasAssistantMessages(params.sessionFile)
         : false;
-    const skipContextInjection = contextInjectionMode === "first-message-only" && hasUserMessages;
+    const skipContextInjection =
+      contextInjectionMode === "first-message-only" && hasAssistantMessages;
 
     const { bootstrapFiles: hookAdjustedBootstrapFiles, contextFiles: rawContextFiles } =
       await resolveBootstrapContextForRun({
