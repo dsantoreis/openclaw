@@ -71,6 +71,11 @@ const { startTelegramWebhookSpy } = vi.hoisted(() => ({
   startTelegramWebhookSpy: vi.fn(async () => ({ server: { close: vi.fn() }, stop: vi.fn() })),
 }));
 
+const { readTelegramUpdateOffsetMock, writeTelegramUpdateOffsetMock } = vi.hoisted(() => ({
+  readTelegramUpdateOffsetMock: vi.fn(async () => null as number | null),
+  writeTelegramUpdateOffsetMock: vi.fn(async () => undefined),
+}));
+
 type RunnerStub = {
   task: () => Promise<void>;
   stop: ReturnType<typeof vi.fn<() => void | Promise<void>>>;
@@ -183,6 +188,11 @@ vi.mock("./webhook.js", () => ({
   startTelegramWebhook: startTelegramWebhookSpy,
 }));
 
+vi.mock("./update-offset-store.js", () => ({
+  readTelegramUpdateOffset: readTelegramUpdateOffsetMock,
+  writeTelegramUpdateOffset: writeTelegramUpdateOffsetMock,
+}));
+
 vi.mock("../auto-reply/reply.js", () => ({
   getReplyFromConfig: async (ctx: { Body?: string }) => ({
     text: `echo:${ctx.Body}`,
@@ -206,6 +216,8 @@ describe("monitorTelegramProvider (grammY)", () => {
     computeBackoff.mockClear();
     sleepWithAbort.mockClear();
     startTelegramWebhookSpy.mockClear();
+    readTelegramUpdateOffsetMock.mockReset().mockResolvedValue(null);
+    writeTelegramUpdateOffsetMock.mockReset().mockResolvedValue(undefined);
     registerUnhandledRejectionHandlerMock.mockClear();
     resetUnhandledRejection();
     createTelegramBotErrors.length = 0;
@@ -422,6 +434,57 @@ describe("monitorTelegramProvider (grammY)", () => {
     expect(computeBackoff).toHaveBeenCalled();
     expect(sleepWithAbort).toHaveBeenCalled();
     expect(runSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("restarts stale polling when inbound updates stop for too long", async () => {
+    vi.useFakeTimers();
+    try {
+      readTelegramUpdateOffsetMock.mockResolvedValueOnce(42);
+      const abort = new AbortController();
+      let running = true;
+      let releaseTask: (() => void) | undefined;
+      const stop = vi.fn(async () => {
+        running = false;
+        releaseTask?.();
+      });
+
+      runSpy
+        .mockImplementationOnce(() =>
+          makeRunnerStub({
+            task: () =>
+              new Promise<void>((resolve) => {
+                releaseTask = resolve;
+              }),
+            stop,
+            isRunning: () => running,
+          }),
+        )
+        .mockImplementationOnce(() =>
+          makeRunnerStub({
+            task: async () => {
+              abort.abort();
+            },
+          }),
+        );
+
+      const monitor = monitorTelegramProvider({
+        token: "tok",
+        abortSignal: abort.signal,
+        pollingStallAfterMs: 60_000,
+        pollingStallCheckMs: 5_000,
+      });
+
+      await vi.waitFor(() => expect(runSpy).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(65_000);
+      await monitor;
+
+      expect(stop).toHaveBeenCalled();
+      expect(computeBackoff).toHaveBeenCalled();
+      expect(sleepWithAbort).toHaveBeenCalled();
+      expect(runSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("passes configured webhookHost to webhook listener", async () => {

@@ -30,6 +30,10 @@ export type MonitorTelegramOpts = {
   webhookHost?: string;
   proxyFetch?: typeof fetch;
   webhookUrl?: string;
+  /** Testing/advanced override: how long inbound silence is tolerated before polling restart. */
+  pollingStallAfterMs?: number;
+  /** Testing/advanced override: watchdog check cadence for stale polling detection. */
+  pollingStallCheckMs?: number;
 };
 
 export function createTelegramRunnerOptions(cfg: OpenClawConfig): RunOptions<unknown> {
@@ -60,6 +64,9 @@ const TELEGRAM_POLL_RESTART_POLICY = {
   factor: 1.8,
   jitter: 0.25,
 };
+
+const DEFAULT_POLLING_STALL_AFTER_MS = 4 * 60 * 60 * 1000;
+const DEFAULT_POLLING_STALL_CHECK_MS = 60 * 1000;
 
 type TelegramBot = ReturnType<typeof createTelegramBot>;
 
@@ -141,11 +148,13 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
       accountId: account.accountId,
       botToken: token,
     });
+    let lastInboundAtMs = Date.now();
     const persistUpdateId = async (updateId: number) => {
       if (lastUpdateId !== null && updateId <= lastUpdateId) {
         return;
       }
       lastUpdateId = updateId;
+      lastInboundAtMs = Date.now();
       try {
         await writeTelegramUpdateOffset({
           accountId: account.accountId,
@@ -270,6 +279,36 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
           });
         return stopPromise;
       };
+
+      const stallAfterMs = Math.max(
+        60_000,
+        opts.pollingStallAfterMs ?? DEFAULT_POLLING_STALL_AFTER_MS,
+      );
+      const stallCheckMs = Math.max(
+        5_000,
+        opts.pollingStallCheckMs ?? DEFAULT_POLLING_STALL_CHECK_MS,
+      );
+      let stallWatchdog: ReturnType<typeof setInterval> | undefined;
+      // Start stale polling watchdog only after we've received at least one update.
+      if (lastUpdateId !== null) {
+        stallWatchdog = setInterval(() => {
+          if (opts.abortSignal?.aborted || !runner.isRunning()) {
+            return;
+          }
+          const staleForMs = Date.now() - lastInboundAtMs;
+          if (staleForMs < stallAfterMs) {
+            return;
+          }
+          forceRestarted = true;
+          // Reset local timer to avoid repeated stop calls before restart loop runs.
+          lastInboundAtMs = Date.now();
+          void stopRunner();
+          log(
+            `[telegram] Polling appears stale (no inbound updates for ${formatDurationPrecise(staleForMs)}); restarting runner`,
+          );
+        }, stallCheckMs);
+        stallWatchdog.unref?.();
+      }
       const stopBot = () => {
         return Promise.resolve(bot.stop())
           .then(() => undefined)
@@ -314,6 +353,9 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
         );
         return shouldRestart ? "continue" : "exit";
       } finally {
+        if (stallWatchdog) {
+          clearInterval(stallWatchdog);
+        }
         opts.abortSignal?.removeEventListener("abort", stopOnAbort);
         await stopRunner();
         await stopBot();
