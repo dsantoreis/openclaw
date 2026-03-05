@@ -84,8 +84,12 @@ export function formatErrorMessage(err: unknown): string {
   return redactSensitiveText(formatted);
 }
 
-export function isRecoverableTlsSessionNullDeref(err: unknown): boolean {
-  const text = formatUncaughtError(err).toLowerCase();
+export function isRecoverableTlsSessionNullDeref(
+  err: unknown,
+  formattedText?: string,
+): boolean {
+  const raw = formattedText ?? formatUncaughtError(err);
+  const text = typeof raw === "string" ? raw.toLowerCase() : String(raw ?? "").toLowerCase();
   return (
     text.includes("cannot read properties of null") &&
     text.includes("setsession") &&

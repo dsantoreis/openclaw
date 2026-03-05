@@ -97,11 +97,9 @@ export async function runCli(argv: string[] = process.argv) {
   installUnhandledRejectionHandler();
 
   process.on("uncaughtException", (error) => {
-    if (isRecoverableTlsSessionNullDeref(error)) {
-      console.warn(
-        "[openclaw] Suppressed recoverable TLS reconnect null-deref:",
-        formatUncaughtError(error),
-      );
+    const formatted = formatUncaughtError(error);
+    if (isRecoverableTlsSessionNullDeref(error, formatted)) {
+      console.warn("[openclaw] Suppressed recoverable TLS reconnect null-deref:", formatted);
       return;
     }
     console.error("[openclaw] Uncaught exception:", formatUncaughtError(error));
