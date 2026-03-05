@@ -150,4 +150,32 @@ describe("buildTelegramMessageContext audio transcript body", () => {
     expect(transcribeFirstAudioMock).not.toHaveBeenCalled();
     expectAudioPlaceholderRendered(ctx);
   });
+
+  it("uses preflight transcript for DM voice-only messages", async () => {
+    transcribeFirstAudioMock.mockResolvedValueOnce("dm transcript sample");
+
+    const ctx = await buildTelegramMessageContextForTest({
+      message: {
+        message_id: 5,
+        chat: { id: 777001, type: "private" },
+        date: 1700000400,
+        text: undefined,
+        from: { id: 46, first_name: "Eve" },
+        voice: { file_id: "voice-5" },
+      },
+      allMedia: [{ path: "/tmp/voice5.ogg", contentType: "audio/ogg" }],
+      cfg: {
+        agents: { defaults: { model: DEFAULT_MODEL, workspace: DEFAULT_WORKSPACE } },
+        channels: { telegram: {} },
+      },
+      resolveGroupActivation: () => true,
+      resolveGroupRequireMention: () => false,
+      resolveTelegramGroupConfig: () => ({ groupConfig: undefined, topicConfig: undefined }),
+    });
+
+    expect(transcribeFirstAudioMock).toHaveBeenCalledTimes(1);
+    expect(ctx).not.toBeNull();
+    expect(ctx?.ctxPayload?.BodyForAgent).toBe("dm transcript sample");
+    expect(ctx?.ctxPayload?.Body).toContain("dm transcript sample");
+  });
 });
