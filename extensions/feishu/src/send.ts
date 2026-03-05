@@ -1,5 +1,6 @@
 import type { ClawdbotConfig } from "openclaw/plugin-sdk/feishu";
 import { resolveFeishuAccount } from "./accounts.js";
+import { raceWithTimeoutAndAbort } from "./async.js";
 import { createFeishuClient } from "./client.js";
 import type { MentionTarget } from "./mention.js";
 import { buildMentionedMessage, buildMentionedCardContent } from "./mention.js";
@@ -10,6 +11,27 @@ import { resolveFeishuSendTarget } from "./send-target.js";
 import type { FeishuSendResult } from "./types.js";
 
 const WITHDRAWN_REPLY_ERROR_CODES = new Set([230011, 231003]);
+const DEFAULT_FEISHU_SEND_TIMEOUT_MS = 20_000;
+
+function resolveFeishuSendTimeoutMs(): number {
+  const raw = process.env.OPENCLAW_FEISHU_SEND_TIMEOUT_MS;
+  if (!raw) return DEFAULT_FEISHU_SEND_TIMEOUT_MS;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_FEISHU_SEND_TIMEOUT_MS;
+  return parsed;
+}
+
+async function withFeishuSendTimeout<T>(promise: Promise<T>, operationLabel: string): Promise<T> {
+  const timeoutMs = resolveFeishuSendTimeoutMs();
+  const result = await raceWithTimeoutAndAbort(promise, { timeoutMs });
+  if (result.status === "timeout") {
+    throw new Error(`${operationLabel} timed out after ${timeoutMs}ms`);
+  }
+  if (result.status === "aborted") {
+    throw new Error(`${operationLabel} aborted`);
+  }
+  return result.value;
+}
 
 function shouldFallbackFromReplyTarget(response: { code?: number; msg?: string }): boolean {
   if (response.code !== undefined && WITHDRAWN_REPLY_ERROR_CODES.has(response.code)) {
@@ -62,14 +84,17 @@ async function sendFallbackDirect(
   },
   errorPrefix: string,
 ): Promise<FeishuSendResult> {
-  const response = await client.im.message.create({
-    params: { receive_id_type: params.receiveIdType },
-    data: {
-      receive_id: params.receiveId,
-      content: params.content,
-      msg_type: params.msgType,
-    },
-  });
+  const response = await withFeishuSendTimeout(
+    client.im.message.create({
+      params: { receive_id_type: params.receiveIdType },
+      data: {
+        receive_id: params.receiveId,
+        content: params.content,
+        msg_type: params.msgType,
+      },
+    }),
+    "Feishu message create",
+  );
   assertFeishuMessageApiSuccess(response, errorPrefix);
   return toFeishuSendResult(response, params.receiveId);
 }
@@ -299,14 +324,17 @@ export async function sendMessageFeishu(
   if (replyToMessageId) {
     let response: { code?: number; msg?: string; data?: { message_id?: string } };
     try {
-      response = await client.im.message.reply({
-        path: { message_id: replyToMessageId },
-        data: {
-          content,
-          msg_type: msgType,
-          ...(replyInThread ? { reply_in_thread: true } : {}),
-        },
-      });
+      response = await withFeishuSendTimeout(
+        client.im.message.reply({
+          path: { message_id: replyToMessageId },
+          data: {
+            content,
+            msg_type: msgType,
+            ...(replyInThread ? { reply_in_thread: true } : {}),
+          },
+        }),
+        "Feishu message reply",
+      );
     } catch (err) {
       if (!isWithdrawnReplyError(err)) {
         throw err;
@@ -343,14 +371,17 @@ export async function sendCardFeishu(params: SendFeishuCardParams): Promise<Feis
   if (replyToMessageId) {
     let response: { code?: number; msg?: string; data?: { message_id?: string } };
     try {
-      response = await client.im.message.reply({
-        path: { message_id: replyToMessageId },
-        data: {
-          content,
-          msg_type: "interactive",
-          ...(replyInThread ? { reply_in_thread: true } : {}),
-        },
-      });
+      response = await withFeishuSendTimeout(
+        client.im.message.reply({
+          path: { message_id: replyToMessageId },
+          data: {
+            content,
+            msg_type: "interactive",
+            ...(replyInThread ? { reply_in_thread: true } : {}),
+          },
+        }),
+        "Feishu card reply",
+      );
     } catch (err) {
       if (!isWithdrawnReplyError(err)) {
         throw err;

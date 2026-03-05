@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const resolveFeishuSendTargetMock = vi.hoisted(() => vi.fn());
 const resolveMarkdownTableModeMock = vi.hoisted(() => vi.fn(() => "preserve"));
@@ -24,8 +24,10 @@ import { sendCardFeishu, sendMessageFeishu } from "./send.js";
 describe("Feishu reply fallback for withdrawn/deleted targets", () => {
   const replyMock = vi.fn();
   const createMock = vi.fn();
+  const previousTimeoutEnv = process.env.OPENCLAW_FEISHU_SEND_TIMEOUT_MS;
 
   beforeEach(() => {
+    process.env.OPENCLAW_FEISHU_SEND_TIMEOUT_MS = "50";
     vi.clearAllMocks();
     resolveFeishuSendTargetMock.mockReturnValue({
       client: {
@@ -39,6 +41,15 @@ describe("Feishu reply fallback for withdrawn/deleted targets", () => {
       receiveId: "ou_target",
       receiveIdType: "open_id",
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    if (previousTimeoutEnv === undefined) {
+      delete process.env.OPENCLAW_FEISHU_SEND_TIMEOUT_MS;
+      return;
+    }
+    process.env.OPENCLAW_FEISHU_SEND_TIMEOUT_MS = previousTimeoutEnv;
   });
 
   it("falls back to create for withdrawn post replies", async () => {
@@ -175,5 +186,22 @@ describe("Feishu reply fallback for withdrawn/deleted targets", () => {
     ).rejects.toThrow("permission denied");
 
     expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it("fails fast when Feishu create hangs", async () => {
+    vi.useFakeTimers();
+    createMock.mockImplementation(() => new Promise(() => {}));
+
+    const sendPromise = sendMessageFeishu({
+      cfg: {} as never,
+      to: "user:ou_target",
+      text: "hello",
+    }).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(60);
+
+    const error = await sendPromise;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("Feishu message create timed out");
   });
 });
