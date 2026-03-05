@@ -43,7 +43,7 @@ function splitReplyForSynologyChat(
   text: string,
   maxChars = SYNLOGY_CHAT_REPLY_CHUNK_MAX,
 ): string[] {
-  const normalized = text.replace(/\r\n/g, "\n").trim();
+  const normalized = text.replace(/\r\n/g, "\n");
   if (!normalized) {
     return [];
   }
@@ -61,8 +61,8 @@ function splitReplyForSynologyChat(
     if (cut <= 0) {
       cut = maxChars;
     }
-    chunks.push(remaining.slice(0, cut).trim());
-    remaining = remaining.slice(cut).trimStart();
+    chunks.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut);
   }
   if (remaining.length > 0) {
     chunks.push(remaining);
