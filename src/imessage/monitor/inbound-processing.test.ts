@@ -91,7 +91,7 @@ describe("resolveIMessageInboundDecision sender fallback", () => {
     expect(decision).toEqual({ kind: "drop", reason: "missing sender" });
   });
 
-  it("trims whitespace on reply_to_sender fallback", () => {
+  it("keeps ignoring reply_to_sender even when padded with whitespace", () => {
     const decision = resolveIMessageInboundDecision({
       cfg,
       accountId: "default",
@@ -117,11 +117,7 @@ describe("resolveIMessageInboundDecision sender fallback", () => {
       logVerbose: undefined,
     });
 
-    expect(decision.kind).toBe("dispatch");
-    if (decision.kind !== "dispatch") {
-      return;
-    }
-    expect(decision.sender).toBe("+15555550009");
+    expect(decision).toEqual({ kind: "drop", reason: "missing sender" });
   });
 
   it("uses single participant as group sender fallback when sender is missing", () => {
@@ -156,6 +152,40 @@ describe("resolveIMessageInboundDecision sender fallback", () => {
       return;
     }
     expect(decision.sender).toBe("+15555550002");
+  });
+
+  it("trims whitespace in single-participant group fallback", () => {
+    const decision = resolveIMessageInboundDecision({
+      cfg,
+      accountId: "default",
+      message: {
+        id: 781,
+        sender: "",
+        participants: ["   +15555550008   "],
+        text: "group msg",
+        chat_id: 1,
+        is_from_me: false,
+        is_group: true,
+      },
+      opts: undefined,
+      messageText: "group msg",
+      bodyText: "group msg",
+      allowFrom: [],
+      groupAllowFrom: [],
+      groupPolicy: "open",
+      dmPolicy: "open",
+      storeAllowFrom: [],
+      historyLimit: 0,
+      groupHistories: new Map(),
+      echoCache: undefined,
+      logVerbose: undefined,
+    });
+
+    expect(decision.kind).toBe("dispatch");
+    if (decision.kind !== "dispatch") {
+      return;
+    }
+    expect(decision.sender).toBe("+15555550008");
   });
 
   it("keeps dropping ambiguous group sender when multiple participants exist", () => {
