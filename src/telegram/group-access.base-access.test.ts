@@ -53,4 +53,19 @@ describe("evaluateTelegramGroupBaseAccess", () => {
 
     expect(result).toEqual({ allowed: true });
   });
+
+  it("allows group when group chat id is explicitly listed in override", () => {
+    const result = evaluateTelegramGroupBaseAccess({
+      isGroup: true,
+      chatId: "-10012345",
+      hasGroupAllowOverride: true,
+      effectiveGroupAllow: allow(["-10012345"]),
+      senderId: "98765",
+      senderUsername: "tester",
+      enforceAllowOverride: true,
+      requireSenderForAllowOverride: true,
+    });
+
+    expect(result).toEqual({ allowed: true });
+  });
 });

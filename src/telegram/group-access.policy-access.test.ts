@@ -193,4 +193,24 @@ describe("evaluateTelegramGroupPolicyAccess – chat allowlist vs sender allowli
 
     expect(result).toEqual({ allowed: true, groupPolicy: "allowlist" });
   });
+
+  it("allows group when chat id is present in groupAllowFrom entries", () => {
+    const result = runAccess({
+      chatId: "-100123456",
+      effectiveGroupAllow: {
+        entries: ["-100123456"],
+        hasWildcard: false,
+        hasEntries: true,
+        invalidEntries: [],
+      },
+      senderId: "222",
+      resolveGroupPolicy: () => ({
+        allowlistEnabled: true,
+        allowed: true,
+        groupConfig: undefined,
+      }),
+    });
+
+    expect(result).toEqual({ allowed: true, groupPolicy: "allowlist" });
+  });
 });

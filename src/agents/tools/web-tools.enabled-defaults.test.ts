@@ -15,7 +15,11 @@ function installMockFetch(payload: unknown) {
   return mockFetch;
 }
 
-function createPerplexitySearchTool(perplexityConfig?: { apiKey?: string }) {
+function createPerplexitySearchTool(perplexityConfig?: {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+}) {
   return createWebSearchTool({
     config: {
       tools: {
@@ -276,6 +280,34 @@ describe("web_search perplexity Search API", () => {
     expect(mockFetch).toHaveBeenCalled();
     const body = parseFirstRequestBody(mockFetch);
     expect(body.country).toBe("DE");
+  });
+
+  it("uses chat completions endpoint when Perplexity baseUrl points to OpenRouter", async () => {
+    const mockFetch = installMockFetch({
+      choices: [{ message: { content: "OpenRouter answer" } }],
+      citations: ["https://openrouter.ai/docs"],
+    });
+    const tool = createPerplexitySearchTool({
+      apiKey: "sk-or-v1-test",
+      baseUrl: "https://openrouter.ai/api/v1",
+      model: "perplexity/sonar",
+    });
+
+    const result = await tool?.execute?.("call-1", { query: "test" });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(mockFetch.mock.calls[0]?.[0]).toBe("https://openrouter.ai/api/v1/chat/completions");
+    const body = parseFirstRequestBody(mockFetch);
+    expect(body.model).toBe("perplexity/sonar");
+    expect(result?.details).toMatchObject({
+      provider: "perplexity",
+      results: [
+        expect.objectContaining({
+          url: "https://openrouter.ai/docs",
+          description: expect.stringContaining("OpenRouter answer"),
+        }),
+      ],
+    });
   });
 
   it("uses config API key when provided", async () => {

@@ -510,6 +510,7 @@ export const registerTelegramHandlers = ({
     } = params;
     const baseAccess = evaluateTelegramGroupBaseAccess({
       isGroup,
+      chatId,
       groupConfig,
       topicConfig,
       hasGroupAllowOverride,
