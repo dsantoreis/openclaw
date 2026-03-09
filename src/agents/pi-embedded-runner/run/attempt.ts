@@ -40,6 +40,7 @@ import {
 import {
   makeBootstrapWarn,
   resolveBootstrapContextForRun,
+  resolveBootstrapFilesForRun,
   sessionHasAssistantMessages,
 } from "../../bootstrap-files.js";
 import { createCacheTrace } from "../../cache-trace.js";
@@ -804,7 +805,7 @@ export async function runEmbeddedAttempt(
       params.contextInjection ?? params.config?.agents?.defaults?.contextInjection;
     const hasExistingAssistantMessages =
       contextInjection === "first-message-only"
-        ? sessionHasAssistantMessages(params.sessionFile)
+        ? await sessionHasAssistantMessages(params.sessionFile)
         : false;
     const { bootstrapFiles: hookAdjustedBootstrapFiles, contextFiles } =
       await resolveBootstrapContextForRun({
@@ -835,7 +836,21 @@ export async function runEmbeddedAttempt(
       seenSignatures: params.bootstrapPromptWarningSignaturesSeen,
       previousSignature: params.bootstrapPromptWarningSignature,
     });
-    const workspaceNotes = hookAdjustedBootstrapFiles.some(
+    const bootstrapMetadataFiles =
+      contextInjection === "first-message-only" && hasExistingAssistantMessages
+        ? await resolveBootstrapFilesForRun({
+            workspaceDir: effectiveWorkspace,
+            config: params.config,
+            sessionKey: params.sessionKey,
+            sessionId: params.sessionId,
+            warn: makeBootstrapWarn({ sessionLabel, warn: (message) => log.warn(message) }),
+            contextMode: params.bootstrapContextMode,
+            runKind: params.bootstrapContextRunKind,
+            contextInjection: "always",
+            hasExistingAssistantMessages: false,
+          })
+        : hookAdjustedBootstrapFiles;
+    const workspaceNotes = bootstrapMetadataFiles.some(
       (file) => file.name === DEFAULT_BOOTSTRAP_FILENAME && !file.missing,
     )
       ? ["Reminder: commit your changes in this workspace after edits."]
