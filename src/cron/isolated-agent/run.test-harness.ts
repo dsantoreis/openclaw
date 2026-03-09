@@ -65,6 +65,15 @@ vi.mock("../../agents/skills/refresh.js", () => ({
 
 vi.mock("../../agents/workspace.js", () => ({
   ensureAgentWorkspace: vi.fn().mockResolvedValue({ dir: "/tmp/workspace" }),
+  DEFAULT_AGENTS_FILENAME: "AGENTS.md",
+  DEFAULT_SOUL_FILENAME: "SOUL.md",
+  DEFAULT_TOOLS_FILENAME: "TOOLS.md",
+  DEFAULT_IDENTITY_FILENAME: "IDENTITY.md",
+  DEFAULT_USER_FILENAME: "USER.md",
+  DEFAULT_HEARTBEAT_FILENAME: "HEARTBEAT.md",
+  DEFAULT_BOOTSTRAP_FILENAME: "BOOTSTRAP.md",
+  DEFAULT_MEMORY_FILENAME: "MEMORY.md",
+  DEFAULT_MEMORY_ALT_FILENAME: "memory.md",
 }));
 
 vi.mock("../../agents/model-catalog.js", () => ({
