@@ -70,11 +70,10 @@ describe("last-tab guard (closeTarget safety)", () => {
     expect(isLastRemainingTab([null, { id: 5 }, { id: 6 }], 5)).toBe(false);
   });
 
-  it("treats tabs with undefined id as valid entries (chrome behavior)", () => {
-    // Chrome can return tab objects with id=undefined in edge cases.
-    // The current implementation filters by id !== tabIdToClose, so
-    // undefined-id entries count as "other tabs" (safe to close).
-    expect(isLastRemainingTab([{ id: undefined }, { id: 7 }], 7)).toBe(false);
+  it("ignores tabs with undefined id when checking last-tab safety", () => {
+    // Undefined IDs are not actionable close targets and must not count as
+    // remaining tabs, otherwise the guard can allow closing the final real tab.
+    expect(isLastRemainingTab([{ id: undefined }, { id: 7 }], 7)).toBe(true);
   });
 
   it("blocks when allTabs is not an array (defensive)", () => {
@@ -159,7 +158,7 @@ describe("relay reconnect backoff", () => {
     expect(reconnectDelayMs(0, withJitter)).toBe(2000);
   });
 
-  it("never returns negative values for negative attempts", () => {
-    expect(reconnectDelayMs(-5, noJitter)).toBeGreaterThanOrEqual(0);
+  it("clamps negative attempts to base delay", () => {
+    expect(reconnectDelayMs(-5, noJitter)).toBe(1000);
   });
 });
