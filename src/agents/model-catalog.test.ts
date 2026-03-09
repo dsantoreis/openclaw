@@ -149,6 +149,7 @@ describe("loadModelCatalog", () => {
         provider: "openai",
         id: "gpt-5.4",
         name: "gpt-5.4",
+        contextWindow: 1_050_000,
       }),
     );
     expect(result).toContainEqual(
@@ -156,6 +157,7 @@ describe("loadModelCatalog", () => {
         provider: "openai",
         id: "gpt-5.4-pro",
         name: "gpt-5.4-pro",
+        contextWindow: 1_050_000,
       }),
     );
     expect(result).toContainEqual(
@@ -163,8 +165,30 @@ describe("loadModelCatalog", () => {
         provider: "openai-codex",
         id: "gpt-5.4",
         name: "gpt-5.4",
+        contextWindow: 1_050_000,
       }),
     );
+  });
+
+  it("overrides template contextWindow for gpt-5.4 synthetic entries", async () => {
+    mockPiDiscoveryModels([
+      {
+        id: "gpt-5.3-codex",
+        provider: "openai-codex",
+        name: "GPT-5.3 Codex",
+        reasoning: true,
+        contextWindow: 266_000,
+        input: ["text", "image"],
+      },
+    ]);
+
+    const result = await loadModelCatalog({ config: {} as OpenClawConfig });
+    const codexGpt54 = result.find(
+      (entry) => entry.provider === "openai-codex" && entry.id === "gpt-5.4",
+    );
+
+    expect(codexGpt54).toBeDefined();
+    expect(codexGpt54?.contextWindow).toBe(1_050_000);
   });
 
   it("merges configured models for opted-in non-pi-native providers", async () => {
