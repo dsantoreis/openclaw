@@ -284,25 +284,28 @@ describe("launchd install", () => {
     expect(plist).toContain(`<integer>${LAUNCH_AGENT_THROTTLE_INTERVAL_SECONDS}</integer>`);
   });
 
-  it("tightens writable bits on launch agent dirs and plist", async () => {
-    const env = createDefaultLaunchdEnv();
-    state.dirs.add(env.HOME!);
-    state.dirModes.set(env.HOME!, 0o777);
-    state.dirs.add("/Users/test/Library");
-    state.dirModes.set("/Users/test/Library", 0o777);
+  it.runIf(process.platform !== "win32")(
+    "tightens writable bits on launch agent dirs and plist",
+    async () => {
+      const env = createDefaultLaunchdEnv();
+      state.dirs.add(env.HOME!);
+      state.dirModes.set(env.HOME!, 0o777);
+      state.dirs.add("/Users/test/Library");
+      state.dirModes.set("/Users/test/Library", 0o777);
 
-    await installLaunchAgent({
-      env,
-      stdout: new PassThrough(),
-      programArguments: defaultProgramArguments,
-    });
+      await installLaunchAgent({
+        env,
+        stdout: new PassThrough(),
+        programArguments: defaultProgramArguments,
+      });
 
-    const plistPath = resolveLaunchAgentPlistPath(env);
-    expect(state.dirModes.get(env.HOME!)).toBe(0o755);
-    expect(state.dirModes.get("/Users/test/Library")).toBe(0o755);
-    expect(state.dirModes.get("/Users/test/Library/LaunchAgents")).toBe(0o755);
-    expect(state.fileModes.get(plistPath)).toBe(0o644);
-  });
+      const plistPath = resolveLaunchAgentPlistPath(env);
+      expect(state.dirModes.get(env.HOME!)).toBe(0o755);
+      expect(state.dirModes.get("/Users/test/Library")).toBe(0o755);
+      expect(state.dirModes.get("/Users/test/Library/LaunchAgents")).toBe(0o755);
+      expect(state.fileModes.get(plistPath)).toBe(0o644);
+    },
+  );
 
   it("restarts LaunchAgent with bootout-enable-bootstrap-kickstart order", async () => {
     const env = createDefaultLaunchdEnv();
