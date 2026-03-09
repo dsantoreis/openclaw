@@ -17,7 +17,7 @@ describe("resolveApiKeyForProvider — explicit config key precedence", () => {
         "anthropic-1": {
           type: "api_key",
           provider: "anthropic",
-          key: "sk-ant-OLD-STALE-KEY",
+          key: "test-stale-key-old",
         },
       },
     };
@@ -27,14 +27,14 @@ describe("resolveApiKeyForProvider — explicit config key precedence", () => {
       cfg: {
         models: {
           providers: {
-            anthropic: { apiKey: "sk-ant-NEW-ROTATED-KEY" } as never,
+            anthropic: { apiKey: "test-rotated-key-new" } as never,
           },
         },
       } as never,
       store: staleProfileStore,
     });
 
-    expect(result.apiKey).toBe("sk-ant-NEW-ROTATED-KEY");
+    expect(result.apiKey).toBe("test-rotated-key-new");
     expect(result.source).toBe("models.json");
   });
 
@@ -45,7 +45,7 @@ describe("resolveApiKeyForProvider — explicit config key precedence", () => {
         "anthropic-1": {
           type: "api_key",
           provider: "anthropic",
-          key: "sk-ant-PROFILE-KEY",
+          key: "test-profile-key",
         },
       },
     };
@@ -56,7 +56,7 @@ describe("resolveApiKeyForProvider — explicit config key precedence", () => {
       store,
     });
 
-    expect(result.apiKey).toBe("sk-ant-PROFILE-KEY");
+    expect(result.apiKey).toBe("test-profile-key");
     expect(result.source).toContain("profile:");
   });
 });
