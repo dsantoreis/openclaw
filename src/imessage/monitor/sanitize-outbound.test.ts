@@ -53,6 +53,19 @@ describe("sanitizeOutboundText", () => {
     expect(sanitizeOutboundText(text)).toBe("Hello\n\nWorld");
   });
 
+  it("strips [[reply_to:<id>]] tags", () => {
+    expect(sanitizeOutboundText("[[reply_to:1578]] Hey Matt.")).toBe("Hey Matt.");
+  });
+
+  it("strips [[reply_to_current]] tags", () => {
+    expect(sanitizeOutboundText("[[reply_to_current]] Hello there.")).toBe("Hello there.");
+  });
+
+  it("strips reply tags with whitespace inside brackets", () => {
+    expect(sanitizeOutboundText("[[ reply_to : 42 ]] Hi.")).toBe("Hi.");
+    expect(sanitizeOutboundText("[[ reply_to_current ]] Hi.")).toBe("Hi.");
+  });
+
   it("handles combined internal markers in one message", () => {
     const text = "<thinking>step 1</thinking>NO_REPLY +#+#+#+# assistant to=final\n\nActual reply";
     const result = sanitizeOutboundText(text);
