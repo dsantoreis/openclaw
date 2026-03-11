@@ -249,7 +249,9 @@ export class ExecutionHealthMonitor {
     }
 
     const { messages, prePromptMessageCount } = params;
-    const startIndex = Math.max(prePromptMessageCount, this.lastEvaluatedIndex);
+    const boundedPrePromptCount = Math.min(prePromptMessageCount, messages.length);
+    const previousIndex = Math.min(this.lastEvaluatedIndex, messages.length);
+    const startIndex = Math.max(boundedPrePromptCount, previousIndex);
     const toolCalls = extractToolCalls(messages, startIndex);
     this.lastEvaluatedIndex = messages.length;
 

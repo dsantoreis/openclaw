@@ -171,6 +171,16 @@ describe("ExecutionHealthMonitor", () => {
       const signals = monitor.evaluate({ messages, prePromptMessageCount: 2 });
       expect(signals.find((s) => s.type === "file-burst")).toBeDefined();
     });
+
+    it("clamps stale indexes after compaction shrinks the transcript", () => {
+      const monitor = new ExecutionHealthMonitor({ fileBurstThreshold: 1 });
+      const fullMessages = buildFileWriteSession(1);
+      monitor.evaluate({ messages: fullMessages, prePromptMessageCount: 2 });
+
+      const compactedMessages = fullMessages.slice(0, 2);
+      const signals = monitor.evaluate({ messages: compactedMessages, prePromptMessageCount: 999 });
+      expect(signals).toEqual([]);
+    });
   });
 
   describe("tool-repeat", () => {
