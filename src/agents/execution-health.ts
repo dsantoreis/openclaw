@@ -118,6 +118,10 @@ function getMessageTimestamp(msg: AgentMessage, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
 function isToolResultErrorMessage(msg: AgentMessage, toolUseId: string): boolean {
   if (msg.role === "toolResult") {
     return (
@@ -129,8 +133,8 @@ function isToolResultErrorMessage(msg: AgentMessage, toolUseId: string): boolean
   }
   const resultContent = Array.isArray(msg.content) ? msg.content : [];
   return resultContent.some((rawRb) => {
-    const rb = rawRb as unknown as Record<string, unknown>;
-    return rb.type === "tool_result" && rb.tool_use_id === toolUseId && Boolean(rb.is_error);
+    const rb = asRecord(rawRb);
+    return rb?.type === "tool_result" && rb.tool_use_id === toolUseId && Boolean(rb.is_error);
   });
 }
 
@@ -160,16 +164,14 @@ function extractToolCalls(messages: AgentMessage[], afterIndex: number): ToolCal
 
     const timestamp = getMessageTimestamp(msg, i);
     for (const toolCall of toolCalls) {
-      const block = content.find((rawBlock) => {
-        const rec = rawBlock as unknown as Record<string, unknown>;
-        return rec && typeof rec === "object" && rec.id === toolCall.id;
-      }) as Record<string, unknown> | undefined;
-      if (!block) {
+      const block = content.find((rawBlock) => asRecord(rawBlock)?.id === toolCall.id);
+      const blockRecord = asRecord(block);
+      if (!blockRecord) {
         continue;
       }
 
       const name = toolCall.name ?? "unknown";
-      const args = block.input ?? block.arguments ?? block.args ?? {};
+      const args = blockRecord.input ?? blockRecord.arguments ?? blockRecord.args ?? {};
 
       let isError = false;
       for (let j = i + 1; j < messages.length && j <= i + 3; j++) {
@@ -421,10 +423,10 @@ export class ExecutionHealthMonitor {
         hasToolResult = true;
         allErrors = Boolean((msg as { isError?: unknown }).isError);
       } else if (msg.role === "user") {
-        const content = (Array.isArray(msg.content) ? msg.content : []) as unknown as Array<
-          Record<string, unknown>
-        >;
-        const toolResults = content.filter((b) => b.type === "tool_result");
+        const content = Array.isArray(msg.content) ? msg.content : [];
+        const toolResults = content
+          .map((block) => asRecord(block))
+          .filter((block): block is Record<string, unknown> => block?.type === "tool_result");
         hasToolResult = toolResults.length > 0;
         allErrors = hasToolResult && toolResults.every((b) => b.is_error);
       } else {
