@@ -231,7 +231,7 @@ export function wrapOllamaCompatNumCtx(baseFn: StreamFn | undefined, numCtx: num
       ...options,
       onPayload: (payload: unknown) => {
         if (!payload || typeof payload !== "object") {
-          options?.onPayload?.(payload, model);
+          options?.onPayload?.(payload);
           return;
         }
         const payloadRecord = payload as Record<string, unknown>;
@@ -239,7 +239,7 @@ export function wrapOllamaCompatNumCtx(baseFn: StreamFn | undefined, numCtx: num
           payloadRecord.options = {};
         }
         (payloadRecord.options as Record<string, unknown>).num_ctx = numCtx;
-        options?.onPayload?.(payload, model);
+        options?.onPayload?.(payload);
       },
     });
 }
