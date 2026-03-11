@@ -68,6 +68,7 @@ const EFFECT_TOOL_NAMES = new Set([
   "Bash",
   "bash",
   "computer",
+  "exec",
   "execute_command",
   "run_terminal_command",
 ]);
@@ -112,6 +113,14 @@ type ToolCallEntry = {
   isError: boolean;
   isEffect: boolean;
 };
+
+function fingerprintMessage(msg: AgentMessage): string {
+  const timestamp = getMessageTimestamp(msg, -1);
+  if (typeof msg.content === "string") {
+    return `${msg.role}:${timestamp}:${msg.content}`;
+  }
+  return `${msg.role}:${timestamp}:${serializeToolArgs(msg.content)}`;
+}
 
 function getMessageTimestamp(msg: AgentMessage, fallback: number): number {
   const value = (msg as { timestamp?: unknown }).timestamp;
@@ -192,7 +201,7 @@ function extractToolCalls(messages: AgentMessage[], afterIndex: number): ToolCal
           name === "write" ||
           name === "write_to_file" ||
           name === "create_file") &&
-        typeof argsObj.file_path === "string";
+        (typeof argsObj.file_path === "string" || typeof argsObj.path === "string");
 
       let isEffect = false;
       if (EFFECT_TOOL_NAMES.has(name)) {
@@ -233,6 +242,9 @@ export class ExecutionHealthMonitor {
   /** Previous evaluation index so we only scan new messages. */
   private lastEvaluatedIndex = 0;
 
+  /** Fingerprints of the last evaluated transcript so compaction can be detected safely. */
+  private lastTranscriptFingerprints: string[] = [];
+
   /** Rolling recent tool calls for bounded windowed detectors. */
   private recentToolCalls: ToolCallEntry[] = [];
 
@@ -253,11 +265,26 @@ export class ExecutionHealthMonitor {
     }
 
     const { messages, prePromptMessageCount } = params;
+    const sharedPrefixLength = Math.min(this.lastEvaluatedIndex, messages.length);
+    const transcriptMutated = Array.from({ length: sharedPrefixLength }).some((_, index) => {
+      return this.lastTranscriptFingerprints[index] !== fingerprintMessage(messages[index]);
+    });
+    const transcriptCompacted =
+      transcriptMutated ||
+      messages.length < this.lastEvaluatedIndex ||
+      prePromptMessageCount > messages.length;
+    if (transcriptCompacted) {
+      this.noEffectStreak = 0;
+      this.recentToolCalls = [];
+      this.lastEvaluatedIndex = 0;
+    }
+
     const boundedPrePromptCount = Math.min(prePromptMessageCount, messages.length);
     const previousIndex = Math.min(this.lastEvaluatedIndex, messages.length);
-    const startIndex = Math.max(boundedPrePromptCount, previousIndex);
+    const startIndex = transcriptCompacted ? 0 : Math.max(boundedPrePromptCount, previousIndex);
     const toolCalls = extractToolCalls(messages, startIndex);
     this.lastEvaluatedIndex = messages.length;
+    this.lastTranscriptFingerprints = messages.map((message) => fingerprintMessage(message));
 
     if (toolCalls.length > 0) {
       this.recentToolCalls.push(...toolCalls);
@@ -299,6 +326,7 @@ export class ExecutionHealthMonitor {
   reset(): void {
     this.noEffectStreak = 0;
     this.lastEvaluatedIndex = 0;
+    this.lastTranscriptFingerprints = [];
     this.recentToolCalls = [];
   }
 

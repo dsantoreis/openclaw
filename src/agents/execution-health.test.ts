@@ -172,6 +172,22 @@ describe("ExecutionHealthMonitor", () => {
       expect(signals.find((s) => s.type === "file-burst")).toBeDefined();
     });
 
+    it("treats write.path calls as file writes", () => {
+      const monitor = new ExecutionHealthMonitor({ fileBurstThreshold: 1 });
+      const messages: AgentMessage[] = [
+        makeUserTextMessage("system prompt", 0),
+        makeAssistantTextMessage("acknowledged", 1),
+        makeToolUseMessage(
+          [{ name: "write", input: { path: "/tmp/path-write.md", content: "x" }, id: "w1" }],
+          2,
+        ),
+        makeToolResultMessage([{ tool_use_id: "w1", content: "ok" }], 3),
+      ];
+
+      const signals = monitor.evaluate({ messages, prePromptMessageCount: 2 });
+      expect(signals.find((s) => s.type === "file-burst")).toBeDefined();
+    });
+
     it("clamps stale indexes after compaction shrinks the transcript", () => {
       const monitor = new ExecutionHealthMonitor({ fileBurstThreshold: 1 });
       const fullMessages = buildFileWriteSession(1);
@@ -180,6 +196,34 @@ describe("ExecutionHealthMonitor", () => {
       const compactedMessages = fullMessages.slice(0, 2);
       const signals = monitor.evaluate({ messages: compactedMessages, prePromptMessageCount: 999 });
       expect(signals).toEqual([]);
+    });
+
+    it("rescans compacted transcripts so new turns are not skipped", () => {
+      const monitor = new ExecutionHealthMonitor({ fileBurstThreshold: 1 });
+      const fullMessages = buildFileWriteSession(1);
+      monitor.evaluate({ messages: fullMessages, prePromptMessageCount: 2 });
+
+      const compactedWithNewTurn: AgentMessage[] = [
+        fullMessages[2],
+        fullMessages[3],
+        makeToolUseMessage(
+          [
+            {
+              name: "Write",
+              input: { file_path: "/tmp/after-compaction.md", content: "x" },
+              id: "w2",
+            },
+          ],
+          10,
+        ),
+        makeToolResultMessage([{ tool_use_id: "w2", content: "ok" }], 11),
+      ];
+
+      const signals = monitor.evaluate({
+        messages: compactedWithNewTurn,
+        prePromptMessageCount: 4,
+      });
+      expect(signals.find((s) => s.type === "file-burst")).toBeDefined();
     });
   });
 
@@ -236,6 +280,22 @@ describe("ExecutionHealthMonitor", () => {
   });
 
   describe("no-effect-loop", () => {
+    it("treats exec as an effect tool", () => {
+      const monitor = new ExecutionHealthMonitor({ noEffectLoopThreshold: 2 });
+      const messages: AgentMessage[] = [
+        makeUserTextMessage("system prompt", 0),
+        makeAssistantTextMessage("acknowledged", 1),
+        makeToolUseMessage(
+          [{ name: "exec", input: { command: "git commit -m test" }, id: "exec1" }],
+          2,
+        ),
+        makeToolResultMessage([{ tool_use_id: "exec1", content: "ok" }], 3),
+      ];
+
+      const signals = monitor.evaluate({ messages, prePromptMessageCount: 2 });
+      expect(signals.find((s) => s.type === "no-effect-loop")).toBeUndefined();
+    });
+
     it("treats later tool results in the same user turn as errors", () => {
       const monitor = new ExecutionHealthMonitor({ noEffectLoopThreshold: 2 });
       const messages: AgentMessage[] = [
