@@ -443,11 +443,11 @@ export class ExecutionHealthMonitor {
   private detectErrorCascade(
     _newCalls: ToolCallEntry[],
     messages: AgentMessage[],
-    prePromptMessageCount: number,
+    _prePromptMessageCount: number,
   ): ExecutionHealthSignal | undefined {
     // Walk backwards from the end to count consecutive errored tool-result turns.
     let consecutiveErrors = 0;
-    for (let i = messages.length - 1; i >= prePromptMessageCount; i--) {
+    for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
 
       let hasToolResult = false;

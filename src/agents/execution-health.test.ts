@@ -493,6 +493,15 @@ describe("ExecutionHealthMonitor", () => {
       expect(ec).toBeDefined();
       expect(ec!.details.toolCallCount).toBe(3);
     });
+
+    it("counts consecutive errored turns across turn boundaries", () => {
+      const monitor = new ExecutionHealthMonitor({ errorCascadeThreshold: 3 });
+      const messages = buildErrorSession(3);
+      const signals = monitor.evaluate({ messages, prePromptMessageCount: messages.length - 2 });
+      const ec = signals.find((s) => s.type === "error-cascade");
+      expect(ec).toBeDefined();
+      expect(ec!.details.toolCallCount).toBe(3);
+    });
   });
 
   describe("edge cases", () => {
