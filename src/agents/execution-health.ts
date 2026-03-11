@@ -174,8 +174,12 @@ function extractToolCalls(messages: AgentMessage[], afterIndex: number): ToolCal
       const args = blockRecord.input ?? blockRecord.arguments ?? blockRecord.args ?? {};
 
       let isError = false;
-      for (let j = i + 1; j < messages.length && j <= i + 3; j++) {
-        if (isToolResultErrorMessage(messages[j], toolCall.id)) {
+      for (let j = i + 1; j < messages.length; j++) {
+        const nextMsg = messages[j];
+        if (nextMsg.role === "assistant") {
+          break;
+        }
+        if (isToolResultErrorMessage(nextMsg, toolCall.id)) {
           isError = true;
           break;
         }

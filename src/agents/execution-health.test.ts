@@ -236,6 +236,40 @@ describe("ExecutionHealthMonitor", () => {
   });
 
   describe("no-effect-loop", () => {
+    it("treats later tool results in the same user turn as errors", () => {
+      const monitor = new ExecutionHealthMonitor({ noEffectLoopThreshold: 2 });
+      const messages: AgentMessage[] = [
+        {
+          role: "user",
+          content: [{ type: "text", text: "system prompt" }],
+          timestamp: Date.now(),
+        } as AgentMessage,
+        { role: "assistant", content: [{ type: "text", text: "acknowledged" }] } as AgentMessage,
+      ];
+
+      messages.push(
+        makeToolUseMessage([
+          { name: "Bash", input: { command: "git push origin main" }, id: "push_ok" },
+          { name: "Bash", input: { command: "git push origin main" }, id: "push_fail" },
+          { name: "Read", input: { file_path: "/tmp/context-1.md" }, id: "read_1" },
+          { name: "Read", input: { file_path: "/tmp/context-2.md" }, id: "read_2" },
+        ]),
+      );
+      messages.push(
+        makeToolResultMessage([
+          { tool_use_id: "push_ok", content: "ok" },
+          { tool_use_id: "read_1", content: "ok" },
+          { tool_use_id: "read_2", content: "ok" },
+          { tool_use_id: "push_fail", content: "rejected", is_error: true },
+        ]),
+      );
+
+      const signals = monitor.evaluate({ messages, prePromptMessageCount: 2 });
+      const nel = signals.find((s) => s.type === "no-effect-loop");
+      expect(nel).toBeDefined();
+      expect(nel?.details.effectlessTurns).toBe(2);
+    });
+
     it("detects turns without real effects", () => {
       const monitor = new ExecutionHealthMonitor({ noEffectLoopThreshold: 3 });
       const messages: AgentMessage[] = [
