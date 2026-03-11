@@ -87,8 +87,48 @@ const EFFECT_COMMAND_PATTERNS = [
 const MAX_HASH_ARG_CHARS = 4096;
 
 function serializeToolArgs(args: unknown): string {
+  const seen = new WeakSet<object>();
+  let budget = MAX_HASH_ARG_CHARS;
+
+  const visit = (current: unknown, depth: number): unknown => {
+    if (budget <= 0) {
+      return "<truncated>";
+    }
+    if (depth > 6) {
+      budget -= 11;
+      return "<max_depth>";
+    }
+    if (typeof current === "string") {
+      const next =
+        current.length > Math.max(64, budget) ? current.slice(0, Math.max(64, budget)) : current;
+      budget -= next.length;
+      return next;
+    }
+    if (current === null || typeof current !== "object") {
+      budget -= String(current).length;
+      return current;
+    }
+    if (seen.has(current)) {
+      budget -= 7;
+      return "<cycle>";
+    }
+    seen.add(current);
+    if (Array.isArray(current)) {
+      return current.slice(0, 25).map((entry) => visit(entry, depth + 1));
+    }
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(current).slice(0, 25)) {
+      if (budget <= 0) {
+        break;
+      }
+      budget -= key.length;
+      out[key] = visit(entry, depth + 1);
+    }
+    return out;
+  };
+
   try {
-    const serialized = JSON.stringify(args);
+    const serialized = JSON.stringify(visit(args, 0));
     if (!serialized) {
       return "null";
     }
