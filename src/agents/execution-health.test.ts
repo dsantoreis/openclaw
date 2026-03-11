@@ -53,6 +53,27 @@ function makeSdkToolResultMessage(toolCallId: string, isError = false): AgentMes
   } as unknown as AgentMessage;
 }
 
+function makeNormalizedToolCallMessage(
+  tools: Array<{
+    name: string;
+    arguments: unknown;
+    id?: string;
+    type?: "toolCall" | "toolUse" | "functionCall";
+  }>,
+  timestamp = Date.now(),
+): AgentMessage {
+  return {
+    role: "assistant",
+    timestamp,
+    content: tools.map((t, i) => ({
+      type: t.type ?? "toolCall",
+      id: t.id ?? `tool_${i}`,
+      name: t.name,
+      arguments: t.arguments,
+    })),
+  } as unknown as AgentMessage;
+}
+
 function buildFileWriteSession(count: number): AgentMessage[] {
   const messages: AgentMessage[] = [
     makeUserTextMessage("system prompt", 0),
@@ -251,6 +272,35 @@ describe("ExecutionHealthMonitor", () => {
       expect(signals.find((s) => s.type === "tool-repeat")).toBeUndefined();
     });
 
+    it("detects normalized tool-call blocks", () => {
+      const monitor = new ExecutionHealthMonitor({ toolRepeatThreshold: 2 });
+      const messages: AgentMessage[] = [
+        makeUserTextMessage("system prompt", 0),
+        makeAssistantTextMessage("acknowledged", 1),
+        makeNormalizedToolCallMessage(
+          [{ name: "Bash", arguments: { command: "echo hello" }, id: "norm_1", type: "toolCall" }],
+          2,
+        ),
+        makeSdkToolResultMessage("norm_1", false),
+        makeNormalizedToolCallMessage(
+          [
+            {
+              name: "Bash",
+              arguments: { command: "echo hello" },
+              id: "norm_2",
+              type: "functionCall",
+            },
+          ],
+          3,
+        ),
+        makeSdkToolResultMessage("norm_2", false),
+      ];
+      const signals = monitor.evaluate({ messages, prePromptMessageCount: 2 });
+      const repeat = signals.find((s) => s.type === "tool-repeat");
+      expect(repeat).toBeDefined();
+      expect(repeat!.details.repeatedTools).toContain("Bash");
+    });
+
     it("accumulates repeated calls across turns inside the configured window", () => {
       const monitor = new ExecutionHealthMonitor({
         toolRepeatThreshold: 3,
@@ -296,7 +346,7 @@ describe("ExecutionHealthMonitor", () => {
       expect(signals.find((s) => s.type === "no-effect-loop")).toBeUndefined();
     });
 
-    it("treats later tool results in the same user turn as errors", () => {
+    it("keeps a turn with at least one successful effect out of the no-effect streak", () => {
       const monitor = new ExecutionHealthMonitor({ noEffectLoopThreshold: 2 });
       const messages: AgentMessage[] = [
         {
@@ -306,6 +356,14 @@ describe("ExecutionHealthMonitor", () => {
         } as AgentMessage,
         { role: "assistant", content: [{ type: "text", text: "acknowledged" }] } as AgentMessage,
       ];
+
+      messages.push(
+        makeToolUseMessage([
+          { name: "Write", input: { file_path: "/tmp/first.md", content: "x" }, id: "w1" },
+        ]),
+      );
+      messages.push(makeToolResultMessage([{ tool_use_id: "w1", content: "ok" }]));
+      monitor.evaluate({ messages: [...messages], prePromptMessageCount: 2 });
 
       messages.push(
         makeToolUseMessage([
@@ -325,9 +383,7 @@ describe("ExecutionHealthMonitor", () => {
       );
 
       const signals = monitor.evaluate({ messages, prePromptMessageCount: 2 });
-      const nel = signals.find((s) => s.type === "no-effect-loop");
-      expect(nel).toBeDefined();
-      expect(nel?.details.effectlessTurns).toBe(2);
+      expect(signals.find((s) => s.type === "no-effect-loop")).toBeUndefined();
     });
 
     it("detects turns without real effects", () => {
