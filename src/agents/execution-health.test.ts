@@ -346,6 +346,31 @@ describe("ExecutionHealthMonitor", () => {
       expect(signals.find((s) => s.type === "no-effect-loop")).toBeUndefined();
     });
 
+    it("does not treat message read/search actions as effects", () => {
+      const monitor = new ExecutionHealthMonitor({ noEffectLoopThreshold: 2 });
+      const messages: AgentMessage[] = [
+        makeUserTextMessage("system prompt", 0),
+        makeAssistantTextMessage("acknowledged", 1),
+      ];
+
+      messages.push(
+        makeToolUseMessage([{ name: "message", input: { action: "read" }, id: "m_read" }], 2),
+      );
+      messages.push(makeToolResultMessage([{ tool_use_id: "m_read", content: "ok" }], 3));
+      monitor.evaluate({ messages, prePromptMessageCount: 2 });
+
+      messages.push(
+        makeToolUseMessage(
+          [{ name: "message", input: { action: "search", query: "foo" }, id: "m_search" }],
+          4,
+        ),
+      );
+      messages.push(makeToolResultMessage([{ tool_use_id: "m_search", content: "ok" }], 5));
+
+      const signals = monitor.evaluate({ messages, prePromptMessageCount: 2 });
+      expect(signals.find((s) => s.type === "no-effect-loop")).toBeDefined();
+    });
+
     it("keeps a turn with at least one successful effect out of the no-effect streak", () => {
       const monitor = new ExecutionHealthMonitor({ noEffectLoopThreshold: 2 });
       const messages: AgentMessage[] = [

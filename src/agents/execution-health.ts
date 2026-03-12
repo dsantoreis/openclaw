@@ -81,6 +81,15 @@ const EFFECT_COMMAND_PATTERNS = [
   /\bnpm\s+publish\b/,
 ];
 
+const NON_MUTATING_MESSAGE_ACTIONS = new Set([
+  "read",
+  "search",
+  "reactions",
+  "emoji-list",
+  "list-pins",
+  "member-info",
+]);
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -250,8 +259,13 @@ function extractToolCalls(messages: AgentMessage[], afterIndex: number): ToolCal
           isEffect = EFFECT_COMMAND_PATTERNS.some((re) => re.test(cmd));
         }
       }
-      if (name.includes("send") || name.includes("Send") || name.includes("message")) {
+      if (name.includes("send") || name.includes("Send")) {
         isEffect = true;
+      }
+      if (name.includes("message")) {
+        const action =
+          typeof argsObj.action === "string" ? argsObj.action.trim().toLowerCase() : undefined;
+        isEffect = action ? !NON_MUTATING_MESSAGE_ACTIONS.has(action) : true;
       }
 
       entries.push({
