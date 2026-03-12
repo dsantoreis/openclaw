@@ -8,6 +8,7 @@
  * 4. error-cascade:   consecutive tool errors
  */
 
+import { createHash } from "node:crypto";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { extractToolCallsFromAssistant, extractToolResultId } from "./tool-call-id.js";
 
@@ -156,10 +157,9 @@ type ToolCallEntry = {
 
 function fingerprintMessage(msg: AgentMessage): string {
   const timestamp = getMessageTimestamp(msg, -1);
-  if (typeof msg.content === "string") {
-    return `${msg.role}:${timestamp}:${msg.content}`;
-  }
-  return `${msg.role}:${timestamp}:${serializeToolArgs(msg.content)}`;
+  const payload = typeof msg.content === "string" ? msg.content : serializeToolArgs(msg.content);
+  const digest = createHash("sha256").update(payload).digest("hex").slice(0, 16);
+  return `${msg.role}:${timestamp}:${digest}`;
 }
 
 function getMessageTimestamp(msg: AgentMessage, fallback: number): number {
@@ -324,7 +324,14 @@ export class ExecutionHealthMonitor {
     const startIndex = transcriptCompacted ? 0 : Math.max(boundedPrePromptCount, previousIndex);
     const toolCalls = extractToolCalls(messages, startIndex);
     this.lastEvaluatedIndex = messages.length;
-    this.lastTranscriptFingerprints = messages.map((message) => fingerprintMessage(message));
+
+    if (transcriptCompacted) {
+      this.lastTranscriptFingerprints = messages.map((message) => fingerprintMessage(message));
+    } else {
+      for (let i = this.lastTranscriptFingerprints.length; i < messages.length; i++) {
+        this.lastTranscriptFingerprints.push(fingerprintMessage(messages[i]));
+      }
+    }
 
     if (toolCalls.length > 0) {
       this.recentToolCalls.push(...toolCalls);
