@@ -90,6 +90,46 @@ describe("sandbox pinned mutation helper", () => {
   );
 
   it.runIf(process.platform !== "win32")(
+    "preserves original file mode after atomic write",
+    async () => {
+      await withTempRoot("openclaw-mutation-helper-", async (root) => {
+        const workspace = path.join(root, "workspace");
+        await fs.mkdir(workspace, { recursive: true });
+        const target = path.join(workspace, "existing.txt");
+        await fs.writeFile(target, "original", "utf8");
+        await fs.chmod(target, 0o644);
+
+        const result = runMutation(["write", workspace, "", "existing.txt", "0"], "updated");
+
+        expect(result.status).toBe(0);
+        await expect(fs.readFile(target, "utf8")).resolves.toBe("updated");
+        const stat = await fs.stat(target);
+        // eslint-disable-next-line no-bitwise
+        expect(stat.mode & 0o777).toBe(0o644);
+      });
+    },
+  );
+
+  it.runIf(process.platform !== "win32")(
+    "defaults to 0o644 for new files created by atomic write",
+    async () => {
+      await withTempRoot("openclaw-mutation-helper-", async (root) => {
+        const workspace = path.join(root, "workspace");
+        await fs.mkdir(workspace, { recursive: true });
+
+        const result = runMutation(["write", workspace, "", "brand-new.txt", "0"], "fresh");
+
+        expect(result.status).toBe(0);
+        const target = path.join(workspace, "brand-new.txt");
+        await expect(fs.readFile(target, "utf8")).resolves.toBe("fresh");
+        const stat = await fs.stat(target);
+        // eslint-disable-next-line no-bitwise
+        expect(stat.mode & 0o777).toBe(0o644);
+      });
+    },
+  );
+
+  it.runIf(process.platform !== "win32")(
     "rejects symlink-parent writes instead of materializing a temp file outside the mount",
     async () => {
       await withTempRoot("openclaw-mutation-helper-", async (root) => {
