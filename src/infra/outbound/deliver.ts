@@ -41,7 +41,7 @@ import type { OutboundIdentity } from "./identity.js";
 import type { DeliveryMirror } from "./mirror.js";
 import type { NormalizedOutboundPayload } from "./payloads.js";
 import { normalizeReplyPayloadsForDelivery } from "./payloads.js";
-import { isPlainTextSurface, sanitizeForPlainText } from "./sanitize-text.js";
+import { isPlainTextSurface, sanitizeForPlainText, stripInternalTraces } from "./sanitize-text.js";
 import type { OutboundSessionContext } from "./session-context.js";
 import type { OutboundChannel } from "./targets.js";
 
@@ -299,6 +299,20 @@ function normalizePayloadsForChannelDelivery(
   const normalizedPayloads: ReplyPayload[] = [];
   for (const payload of normalizeReplyPayloadsForDelivery(payloads)) {
     let sanitizedPayload = payload;
+    // Strip internal tool-routing traces for ALL channels (#44905).
+    // Models can emit `to=functions.*`, `commentary`, bare JSON tool args, etc.
+    if (sanitizedPayload.text) {
+      const stripped = stripInternalTraces(sanitizedPayload.text);
+      if (stripped === null) {
+        // Entire payload was internal traces; skip unless it carries media.
+        if (!sanitizedPayload.mediaUrl && !sanitizedPayload.mediaUrls?.length) {
+          continue;
+        }
+        sanitizedPayload = { ...sanitizedPayload, text: "" };
+      } else if (stripped !== sanitizedPayload.text) {
+        sanitizedPayload = { ...sanitizedPayload, text: stripped };
+      }
+    }
     // Strip HTML tags for plain-text surfaces (WhatsApp, Signal, etc.)
     // Models occasionally produce <br>, <b>, etc. that render as literal text.
     // See https://github.com/openclaw/openclaw/issues/31884

@@ -28,6 +28,60 @@ export function isPlainTextSurface(channelId: string): boolean {
 }
 
 /**
+ * Matches lines that carry internal LLM tool-routing artifacts.
+ * These patterns leak from models that emit OpenAI-style function-call routing
+ * directives or similar internal metadata directly in their text output.
+ *
+ * @see https://github.com/openclaw/openclaw/issues/44905
+ */
+const TOOL_ROUTING_LINE_RE =
+  /^(?:to=functions\.\S+.*|commentary\s*$|recipient_name\s*$|parameters\s*$)/m;
+
+/**
+ * Matches bare JSON that looks like leaked tool arguments rather than
+ * user-facing content. Only matches short blobs (<500 chars) starting with
+ * typical tool-argument keys to avoid stripping intentional JSON in replies.
+ */
+const BARE_TOOL_JSON_RE =
+  /^\s*\{\s*"(?:query|maxResults|tool_name|function_call|name|action|parameters)"\s*:/;
+
+/**
+ * Strip internal LLM tool-routing traces from outbound text.
+ *
+ * This runs for **all** channels (not just plain-text surfaces) to prevent
+ * tool-call artifacts from reaching end-users on Discord, Slack, etc.
+ *
+ * Returns `null` when the entire message is an internal trace that should be
+ * suppressed, or the cleaned text otherwise.
+ */
+export function stripInternalTraces(text: string): string | null {
+  if (!text) {
+    return text;
+  }
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return text;
+  }
+  // Suppress messages that are entirely a tool-routing line.
+  if (TOOL_ROUTING_LINE_RE.test(trimmed) && trimmed.split("\n").length <= 2) {
+    return null;
+  }
+  // Suppress short bare JSON blobs that look like leaked tool arguments.
+  if (BARE_TOOL_JSON_RE.test(trimmed) && trimmed.length < 500) {
+    return null;
+  }
+  // Strip individual tool-routing lines from multi-line text.
+  const cleaned = text
+    .replace(/^to=functions\.\S+.*$/gm, "")
+    .replace(/^commentary\s*$/gm, "")
+    .replace(/^recipient_name\s*$/gm, "")
+    .replace(/^parameters\s*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return cleaned || null;
+}
+
+/**
  * Convert common HTML tags to their plain-text/lightweight-markup equivalents
  * and strip anything that remains.
  *

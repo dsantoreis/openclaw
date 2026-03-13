@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPlainTextSurface, sanitizeForPlainText } from "./sanitize-text.js";
+import { isPlainTextSurface, sanitizeForPlainText, stripInternalTraces } from "./sanitize-text.js";
 
 // ---------------------------------------------------------------------------
 // isPlainTextSurface
@@ -112,5 +112,62 @@ describe("sanitizeForPlainText", () => {
 
   it("collapses excessive newlines", () => {
     expect(sanitizeForPlainText("a<br><br><br><br>b")).toBe("a\n\nb");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stripInternalTraces
+// ---------------------------------------------------------------------------
+
+describe("stripInternalTraces", () => {
+  it("returns null for a bare tool-routing line", () => {
+    expect(stripInternalTraces('to=functions.memory_search args={"query":"test"}')).toBeNull();
+  });
+
+  it("returns null for 'commentary' on its own line", () => {
+    expect(stripInternalTraces("commentary")).toBeNull();
+  });
+
+  it("returns null for 'recipient_name' on its own", () => {
+    expect(stripInternalTraces("recipient_name")).toBeNull();
+  });
+
+  it("returns null for 'parameters' on its own", () => {
+    expect(stripInternalTraces("parameters")).toBeNull();
+  });
+
+  it("returns null for bare JSON that looks like tool arguments", () => {
+    expect(stripInternalTraces('{"query":"weather today","maxResults":5}')).toBeNull();
+  });
+
+  it("does not suppress long JSON (>= 500 chars)", () => {
+    const longJson = `{"query":"${"x".repeat(500)}"}`;
+    expect(stripInternalTraces(longJson)).toBe(longJson);
+  });
+
+  it("strips tool-routing lines from multi-line text and keeps the rest", () => {
+    const input = "Hello\nto=functions.memory_search args={}\nWorld";
+    expect(stripInternalTraces(input)).toBe("Hello\n\nWorld");
+  });
+
+  it("passes through normal text unchanged", () => {
+    const text = "Here is a helpful answer about commentary in music.";
+    expect(stripInternalTraces(text)).toBe(text);
+  });
+
+  it("passes through empty/falsy input", () => {
+    expect(stripInternalTraces("")).toBe("");
+    expect(stripInternalTraces(undefined as unknown as string)).toBeUndefined();
+  });
+
+  it("does not suppress JSON that doesn't match tool-argument keys", () => {
+    const userJson = '{"message":"hello","count":42}';
+    expect(stripInternalTraces(userJson)).toBe(userJson);
+  });
+
+  it("collapses excessive newlines after stripping", () => {
+    const input = "Hello\n\nto=functions.foo bar\n\n\nWorld";
+    const result = stripInternalTraces(input);
+    expect(result).not.toContain("\n\n\n");
   });
 });
