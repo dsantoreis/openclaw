@@ -32,9 +32,13 @@ export function resolveCronStyleNow(cfg: TimeConfigLike, nowMs: number): CronSty
 
 export function appendCronStyleCurrentTimeLine(text: string, cfg: TimeConfigLike, nowMs: number) {
   const base = text.trimEnd();
-  if (!base || base.includes("Current time:")) {
+  if (!base) {
     return base;
   }
   const { timeLine } = resolveCronStyleNow(cfg, nowMs);
+  if (base.includes("Current time:")) {
+    // Replace stale timestamp line instead of keeping the old one.
+    return base.replace(/^Current time:.*$/m, timeLine);
+  }
   return `${base}\n${timeLine}`;
 }
