@@ -155,6 +155,27 @@ describe("ws connect policy", () => {
       }).kind,
     ).toBe("reject-device-required");
 
+    // dangerouslyDisableDeviceAuth=true with auth.mode=none (no shared auth)
+    // should allow remote Control UI connections without device identity.
+    const controlUiDangerousBypass = resolveControlUiAuthPolicy({
+      isControlUi: true,
+      controlUiConfig: { dangerouslyDisableDeviceAuth: true },
+      deviceRaw: null,
+    });
+    expect(
+      evaluateMissingDeviceIdentity({
+        hasDeviceIdentity: false,
+        role: "operator",
+        isControlUi: true,
+        controlUiAuthPolicy: controlUiDangerousBypass,
+        trustedProxyAuthOk: false,
+        sharedAuthOk: false,
+        authOk: false,
+        hasSharedAuth: false,
+        isLocalClient: false,
+      }).kind,
+    ).toBe("allow");
+
     // Trusted-proxy authenticated Control UI should bypass device-identity gating.
     expect(
       evaluateMissingDeviceIdentity({
