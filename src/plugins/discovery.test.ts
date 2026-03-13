@@ -223,6 +223,45 @@ describe("discoverOpenClawPlugins", () => {
     expect(ids).not.toContain("ollama-provider");
   });
 
+  it("normalizes provider ids via index-file fallback (no explicit extensions field)", async () => {
+    const stateDir = makeTempDir();
+    const globalExt = path.join(stateDir, "extensions", "vllm-provider");
+    mkdirSafe(globalExt);
+
+    // Package with name but NO openclaw.extensions field -- triggers index-file fallback
+    fs.writeFileSync(
+      path.join(globalExt, "package.json"),
+      JSON.stringify({ name: "@openclaw/vllm-provider" }),
+      "utf-8",
+    );
+    fs.writeFileSync(path.join(globalExt, "index.js"), "module.exports = {}", "utf-8");
+
+    const { candidates } = await discoverWithStateDir(stateDir, {});
+
+    const ids = candidates.map((c) => c.idHint);
+    expect(ids).toContain("vllm");
+    expect(ids).not.toContain("vllm-provider");
+  });
+
+  it("normalizes provider ids via index-file fallback in path-based discovery", async () => {
+    const stateDir = makeTempDir();
+    const packDir = path.join(stateDir, "packs", "sglang-provider");
+    mkdirSafe(packDir);
+
+    fs.writeFileSync(
+      path.join(packDir, "package.json"),
+      JSON.stringify({ name: "@openclaw/sglang-provider" }),
+      "utf-8",
+    );
+    fs.writeFileSync(path.join(packDir, "index.js"), "module.exports = {}", "utf-8");
+
+    const { candidates } = await discoverWithStateDir(stateDir, { extraPaths: [packDir] });
+
+    const ids = candidates.map((c) => c.idHint);
+    expect(ids).toContain("sglang");
+    expect(ids).not.toContain("sglang-provider");
+  });
+
   it("treats configured directory paths as plugin packages", async () => {
     const stateDir = makeTempDir();
     const packDir = path.join(stateDir, "packs", "demo-plugin-dir");
