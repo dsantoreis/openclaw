@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
 import type { PluginRegistry } from "../../plugins/registry.js";
+import { getActivePluginRegistry } from "../../plugins/runtime.js";
 import { withPluginRuntimeGatewayRequestScope } from "../../plugins/runtime/gateway-request-scope.js";
 import { ADMIN_SCOPE, APPROVALS_SCOPE, PAIRING_SCOPE, WRITE_SCOPE } from "../method-scopes.js";
 import { GATEWAY_CLIENT_IDS, GATEWAY_CLIENT_MODES } from "../protocol/client-info.js";
@@ -63,9 +64,14 @@ export function createGatewayPluginRequestHandler(params: {
   registry: PluginRegistry;
   log: SubsystemLogger;
 }): PluginHttpRequestHandler {
-  const { registry, log } = params;
+  const { log } = params;
   return async (req, res, providedPathContext, dispatchContext) => {
-    const routes = registry.httpRoutes ?? [];
+    // Always resolve the registry at request time so webhook routes survive
+    // registry swaps that occur after this handler was constructed (e.g. config
+    // schema lookups, channel status probes). Falls back to the construction-time
+    // registry only when no active registry exists. See #45445.
+    const activeRegistry = getActivePluginRegistry() ?? params.registry;
+    const routes = activeRegistry.httpRoutes ?? [];
     if (routes.length === 0) {
       return false;
     }
@@ -76,7 +82,7 @@ export function createGatewayPluginRequestHandler(params: {
         const url = new URL(req.url ?? "/", "http://localhost");
         return resolvePluginRoutePathContext(url.pathname);
       })();
-    const matchedRoutes = findMatchingPluginHttpRoutes(registry, pathContext);
+    const matchedRoutes = findMatchingPluginHttpRoutes(activeRegistry, pathContext);
     if (matchedRoutes.length === 0) {
       return false;
     }

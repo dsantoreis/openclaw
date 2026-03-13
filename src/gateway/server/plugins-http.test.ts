@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
+import { setActivePluginRegistry } from "../../plugins/runtime.js";
 import type { PluginRuntime } from "../../plugins/runtime/types.js";
 import type { GatewayRequestContext, GatewayRequestOptions } from "../server-methods/types.js";
 import { makeMockHttpResponse } from "../test-http-response.js";
@@ -86,29 +87,37 @@ async function createSubagentRuntime(): Promise<PluginRuntime["subagent"]> {
   return call.runtimeOptions.subagent;
 }
 
+/** Set reg as both the constructor arg and the active plugin registry so
+ *  `createGatewayPluginRequestHandler` resolves routes from it at request time. */
+function createHandlerWithActiveRegistry(
+  reg: ReturnType<typeof createTestRegistry>,
+  log?: ReturnType<typeof createPluginLog>,
+) {
+  setActivePluginRegistry(reg);
+  return createGatewayPluginRequestHandler({ registry: reg, log: log ?? createPluginLog() });
+}
+
 function createSecurePluginRouteHandler(params: {
   exactPluginHandler: () => boolean | Promise<boolean>;
   prefixGatewayHandler: () => boolean | Promise<boolean>;
 }) {
-  return createGatewayPluginRequestHandler({
-    registry: createTestRegistry({
-      httpRoutes: [
-        createRoute({
-          path: "/plugin/secure/report",
-          match: "exact",
-          auth: "plugin",
-          handler: params.exactPluginHandler,
-        }),
-        createRoute({
-          path: "/plugin/secure",
-          match: "prefix",
-          auth: "gateway",
-          handler: params.prefixGatewayHandler,
-        }),
-      ],
-    }),
-    log: createPluginLog(),
+  const reg = createTestRegistry({
+    httpRoutes: [
+      createRoute({
+        path: "/plugin/secure/report",
+        match: "exact",
+        auth: "plugin",
+        handler: params.exactPluginHandler,
+      }),
+      createRoute({
+        path: "/plugin/secure",
+        match: "prefix",
+        auth: "gateway",
+        handler: params.prefixGatewayHandler,
+      }),
+    ],
   });
+  return createHandlerWithActiveRegistry(reg);
 }
 
 describe("createGatewayPluginRequestHandler", () => {
@@ -129,21 +138,20 @@ describe("createGatewayPluginRequestHandler", () => {
 
     const subagent = await createSubagentRuntime();
     const log = createPluginLog();
-    const handler = createGatewayPluginRequestHandler({
-      registry: createTestRegistry({
-        httpRoutes: [
-          createRoute({
-            path: "/hook",
-            auth: "plugin",
-            handler: async (_req, _res) => {
-              await subagent.deleteSession({ sessionKey: "agent:main:subagent:child" });
-              return true;
-            },
-          }),
-        ],
-      }),
-      log,
+    const reg = createTestRegistry({
+      httpRoutes: [
+        createRoute({
+          path: "/hook",
+          auth: "plugin",
+          handler: async (_req, _res) => {
+            await subagent.deleteSession({ sessionKey: "agent:main:subagent:child" });
+            return true;
+          },
+        }),
+      ],
     });
+    setActivePluginRegistry(reg);
+    const handler = createGatewayPluginRequestHandler({ registry: reg, log });
 
     const { res, setHeader, end } = makeMockHttpResponse();
     const handled = await handler({ url: "/hook" } as IncomingMessage, res, undefined, {
@@ -176,12 +184,10 @@ describe("createGatewayPluginRequestHandler", () => {
     const routeHandler = vi.fn(async (_req, res: ServerResponse) => {
       res.statusCode = 200;
     });
-    const handler = createGatewayPluginRequestHandler({
-      registry: createTestRegistry({
-        httpRoutes: [createRoute({ path: "/demo", handler: routeHandler })],
-      }),
-      log: createPluginLog(),
+    const reg = createTestRegistry({
+      httpRoutes: [createRoute({ path: "/demo", handler: routeHandler })],
     });
+    const handler = createHandlerWithActiveRegistry(reg);
 
     const { res } = makeMockHttpResponse();
     const handled = await handler({ url: "/demo" } as IncomingMessage, res);
@@ -194,15 +200,13 @@ describe("createGatewayPluginRequestHandler", () => {
       res.statusCode = 200;
     });
     const prefixHandler = vi.fn(async () => true);
-    const handler = createGatewayPluginRequestHandler({
-      registry: createTestRegistry({
-        httpRoutes: [
-          createRoute({ path: "/api", match: "prefix", handler: prefixHandler }),
-          createRoute({ path: "/api/demo", match: "exact", handler: exactHandler }),
-        ],
-      }),
-      log: createPluginLog(),
+    const reg = createTestRegistry({
+      httpRoutes: [
+        createRoute({ path: "/api", match: "prefix", handler: prefixHandler }),
+        createRoute({ path: "/api/demo", match: "exact", handler: exactHandler }),
+      ],
     });
+    const handler = createHandlerWithActiveRegistry(reg);
 
     const { res } = makeMockHttpResponse();
     const handled = await handler({ url: "/api/demo" } as IncomingMessage, res);
@@ -212,17 +216,15 @@ describe("createGatewayPluginRequestHandler", () => {
   });
 
   it("supports route fallthrough when handler returns false", async () => {
-    const first = vi.fn(async () => false);
+    const first = vi.fn(async () => false as const);
     const second = vi.fn(async () => true);
-    const handler = createGatewayPluginRequestHandler({
-      registry: createTestRegistry({
-        httpRoutes: [
-          createRoute({ path: "/hook", match: "exact", handler: first }),
-          createRoute({ path: "/hook", match: "prefix", handler: second }),
-        ],
-      }),
-      log: createPluginLog(),
+    const reg = createTestRegistry({
+      httpRoutes: [
+        createRoute({ path: "/hook", match: "exact", handler: first }),
+        createRoute({ path: "/hook", match: "prefix", handler: second }),
+      ],
     });
+    const handler = createHandlerWithActiveRegistry(reg);
 
     const { res } = makeMockHttpResponse();
     const handled = await handler({ url: "/hook" } as IncomingMessage, res);
@@ -279,12 +281,10 @@ describe("createGatewayPluginRequestHandler", () => {
     const routeHandler = vi.fn(async (_req, res: ServerResponse) => {
       res.statusCode = 200;
     });
-    const handler = createGatewayPluginRequestHandler({
-      registry: createTestRegistry({
-        httpRoutes: [createRoute({ path: "/api/demo", handler: routeHandler })],
-      }),
-      log: createPluginLog(),
+    const reg = createTestRegistry({
+      httpRoutes: [createRoute({ path: "/api/demo", handler: routeHandler })],
     });
+    const handler = createHandlerWithActiveRegistry(reg);
 
     const { res } = makeMockHttpResponse();
     const handled = await handler({ url: "/API//demo" } as IncomingMessage, res);
@@ -294,19 +294,18 @@ describe("createGatewayPluginRequestHandler", () => {
 
   it("logs and responds with 500 when a route throws", async () => {
     const log = createPluginLog();
-    const handler = createGatewayPluginRequestHandler({
-      registry: createTestRegistry({
-        httpRoutes: [
-          createRoute({
-            path: "/boom",
-            handler: async () => {
-              throw new Error("boom");
-            },
-          }),
-        ],
-      }),
-      log,
+    const reg = createTestRegistry({
+      httpRoutes: [
+        createRoute({
+          path: "/boom",
+          handler: async () => {
+            throw new Error("boom");
+          },
+        }),
+      ],
     });
+    setActivePluginRegistry(reg);
+    const handler = createGatewayPluginRequestHandler({ registry: reg, log });
 
     const { res, setHeader, end } = makeMockHttpResponse();
     const handled = await handler({ url: "/boom" } as IncomingMessage, res);
@@ -315,6 +314,35 @@ describe("createGatewayPluginRequestHandler", () => {
     expect(res.statusCode).toBe(500);
     expect(setHeader).toHaveBeenCalledWith("Content-Type", "text/plain; charset=utf-8");
     expect(end).toHaveBeenCalledWith("Internal Server Error");
+  });
+
+  it("resolves routes from the active registry after a swap (#45445)", async () => {
+    // Simulate the bug: handler is created with an empty registry,
+    // then routes are registered on a new active registry.
+    const emptyReg = createTestRegistry();
+    setActivePluginRegistry(emptyReg);
+    const handler = createGatewayPluginRequestHandler({
+      registry: emptyReg,
+      log: createPluginLog(),
+    });
+
+    // Initially returns false (no routes).
+    const { res: res1 } = makeMockHttpResponse();
+    expect(await handler({ url: "/googlechat" } as IncomingMessage, res1)).toBe(false);
+
+    // Swap the active registry to one with a route (simulates plugin registration).
+    const routeHandler = vi.fn(async (_req, res: ServerResponse) => {
+      res.statusCode = 200;
+    });
+    const newReg = createTestRegistry({
+      httpRoutes: [createRoute({ path: "/googlechat", handler: routeHandler })],
+    });
+    setActivePluginRegistry(newReg);
+
+    // Same handler should now resolve the route from the new active registry.
+    const { res: res2 } = makeMockHttpResponse();
+    expect(await handler({ url: "/googlechat" } as IncomingMessage, res2)).toBe(true);
+    expect(routeHandler).toHaveBeenCalledTimes(1);
   });
 });
 

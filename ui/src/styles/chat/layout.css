@@ -923,6 +923,32 @@
   border-radius: 4px;
 }
 
+.context-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ctx-color);
+  background: var(--ctx-bg);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+.context-notice__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.context-notice__detail {
+  opacity: 0.7;
+  font-size: 11px;
+}
+
 .agent-chat__suggestions {
   display: flex;
   flex-wrap: wrap;
