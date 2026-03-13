@@ -117,6 +117,40 @@ describe("agent delivery helpers", () => {
     expect(plan.resolvedAccountId).toBe("work");
   });
 
+  it("routes webchat request to session's external channel when available", () => {
+    const plan = resolveAgentDeliveryPlan({
+      sessionEntry: {
+        sessionId: "s6",
+        updatedAt: 6,
+        deliveryContext: { channel: "telegram", to: "12345", accountId: "tg" },
+      },
+      requestedChannel: "webchat",
+      explicitTo: undefined,
+      accountId: undefined,
+      wantsDelivery: true,
+    });
+
+    expect(plan.resolvedChannel).toBe("telegram");
+    expect(plan.resolvedTo).toBe("12345");
+    expect(plan.resolvedAccountId).toBe("tg");
+  });
+
+  it("keeps webchat when session has no external channel", () => {
+    const plan = resolveAgentDeliveryPlan({
+      sessionEntry: {
+        sessionId: "s7",
+        updatedAt: 7,
+        deliveryContext: { channel: "webchat" },
+      },
+      requestedChannel: "webchat",
+      explicitTo: undefined,
+      accountId: undefined,
+      wantsDelivery: true,
+    });
+
+    expect(plan.resolvedChannel).toBe("webchat");
+  });
+
   it("does not reuse mutable session to when only turnSourceChannel is provided", () => {
     const plan = resolveAgentDeliveryPlan({
       sessionEntry: {

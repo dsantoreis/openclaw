@@ -88,6 +88,12 @@ export function resolveAgentDeliveryPlan(params: {
 
   const resolvedChannel = (() => {
     if (requestedChannel === INTERNAL_MESSAGE_CHANNEL) {
+      // When the Control UI (webchat) sends to a session that originated
+      // from an external channel (Telegram, Discord, etc.), prefer the
+      // session's stored channel so replies reach the original surface.
+      if (baseDelivery.channel && baseDelivery.channel !== INTERNAL_MESSAGE_CHANNEL) {
+        return baseDelivery.channel;
+      }
       return INTERNAL_MESSAGE_CHANNEL;
     }
     if (requestedChannel === "last") {
