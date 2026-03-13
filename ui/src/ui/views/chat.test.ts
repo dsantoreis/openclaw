@@ -376,4 +376,54 @@ describe("chat view", () => {
     expect(senderLabels).toContain("Iris");
     expect(senderLabels).toContain("Joaquin De Rojas");
   });
+
+  it("truncates oversized message content instead of crashing", () => {
+    const container = document.createElement("div");
+    const hugeContent = "x".repeat(60_000);
+    render(
+      renderChat(
+        createProps({
+          messages: [
+            {
+              role: "assistant",
+              content: hugeContent,
+              timestamp: 1000,
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    // Should render without throwing
+    const bubbles = container.querySelectorAll(".chat-bubble");
+    expect(bubbles.length).toBeGreaterThan(0);
+
+    // Should show truncation notice
+    const notice = container.querySelector(".chat-text-truncated");
+    expect(notice).toBeTruthy();
+    expect(notice!.textContent).toContain("truncated");
+    expect(notice!.textContent).toContain("60k");
+  });
+
+  it("does not truncate messages under the size limit", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          messages: [
+            {
+              role: "assistant",
+              content: "short message",
+              timestamp: 1000,
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    const notice = container.querySelector(".chat-text-truncated");
+    expect(notice).toBeFalsy();
+  });
 });

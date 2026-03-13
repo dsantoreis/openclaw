@@ -144,3 +144,17 @@
   padding-left: 0;
   padding-right: 1em;
 }
+
+/* =============================================
+   TRUNCATION NOTICE
+   ============================================= */
+
+.chat-text-truncated {
+  margin-top: 0.75em;
+  padding: 6px 10px;
+  font-size: 0.8em;
+  color: var(--text-secondary, #888);
+  background: var(--surface-secondary, rgba(128, 128, 128, 0.08));
+  border-radius: 6px;
+  font-style: italic;
+}

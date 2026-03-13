@@ -573,6 +573,13 @@ function renderCollapsedToolCards(
 const MAX_JSON_AUTOPARSE_CHARS = 20_000;
 
 /**
+ * Maximum characters to render per message bubble. Messages exceeding this
+ * limit are truncated with an indicator so the DOM stays manageable even when
+ * the session history contains multi-MB tool outputs.
+ */
+const MAX_RENDER_CHARS = 50_000;
+
+/**
  * Detect whether a trimmed string is a JSON object or array.
  * Must start with `{`/`[` and end with `}`/`]` and parse successfully.
  * Size-capped to prevent render-loop DoS from large JSON messages.
@@ -634,9 +641,11 @@ function renderGroupedMessage(
   const extractedText = extractTextCached(message);
   const extractedThinking =
     opts.showReasoning && role === "assistant" ? extractThinkingCached(message) : null;
-  const markdownBase = extractedText?.trim() ? extractedText : null;
+  const markdownRaw = extractedText?.trim() ? extractedText : null;
   const reasoningMarkdown = extractedThinking ? formatReasoningMarkdown(extractedThinking) : null;
-  const markdown = markdownBase;
+  // Truncate oversized messages to prevent DOM explosion on heavy sessions
+  const isTruncated = markdownRaw != null && markdownRaw.length > MAX_RENDER_CHARS;
+  const markdown = isTruncated ? markdownRaw.slice(0, MAX_RENDER_CHARS) : markdownRaw;
   const canCopyMarkdown = role === "assistant" && Boolean(markdown?.trim());
 
   // Detect pure-JSON messages and render as collapsible block
@@ -700,7 +709,7 @@ function renderGroupedMessage(
                         <pre class="chat-json-content"><code>${jsonResult.pretty}</code></pre>
                       </details>`
                     : markdown
-                      ? html`<div class="chat-text" dir="${detectTextDirection(markdown)}">${unsafeHTML(toSanitizedMarkdownHtml(markdown))}</div>`
+                      ? html`<div class="chat-text" dir="${detectTextDirection(markdown)}">${unsafeHTML(toSanitizedMarkdownHtml(markdown))}${isTruncated ? html`<div class="chat-text-truncated">Content truncated (${(markdownRaw.length / 1000).toFixed(0)}k chars). Use export to see full output.</div>` : nothing}</div>`
                       : nothing
                 }
                 ${hasToolCards ? renderCollapsedToolCards(toolCards, onOpenSidebar) : nothing}
@@ -726,7 +735,7 @@ function renderGroupedMessage(
                     <pre class="chat-json-content"><code>${jsonResult.pretty}</code></pre>
                   </details>`
                 : markdown
-                  ? html`<div class="chat-text" dir="${detectTextDirection(markdown)}">${unsafeHTML(toSanitizedMarkdownHtml(markdown))}</div>`
+                  ? html`<div class="chat-text" dir="${detectTextDirection(markdown)}">${unsafeHTML(toSanitizedMarkdownHtml(markdown))}${isTruncated ? html`<div class="chat-text-truncated">Content truncated (${(markdownRaw.length / 1000).toFixed(0)}k chars). Use export to see full output.</div>` : nothing}</div>`
                   : nothing
             }
             ${hasToolCards ? renderCollapsedToolCards(toolCards, onOpenSidebar) : nothing}
