@@ -648,3 +648,13 @@ describe("chat view", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("favicon.svg intrinsic dimensions", () => {
+  it("has explicit width and height attributes to prevent unconstrained expansion (#45148)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const svg = readFileSync(resolve(__dirname, "../../../public/favicon.svg"), "utf-8");
+    expect(svg).toMatch(/\bwidth=["']\d+["']/);
+    expect(svg).toMatch(/\bheight=["']\d+["']/);
+  });
+});
