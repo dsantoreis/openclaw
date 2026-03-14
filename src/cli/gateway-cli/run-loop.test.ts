@@ -388,6 +388,32 @@ describe("runGatewayLoop", () => {
       );
     });
   });
+
+  it("exits immediately when launchctl full restart fails with ETIMEDOUT", async () => {
+    vi.clearAllMocks();
+
+    await withIsolatedSignals(async () => {
+      const lockRelease = vi.fn(async () => {});
+      acquireGatewayLock.mockResolvedValueOnce({
+        release: lockRelease,
+      });
+
+      restartGatewayProcessWithFreshPid.mockReturnValueOnce({
+        mode: "failed",
+        detail: "spawnSync launchctl ETIMEDOUT",
+      });
+
+      const { start, exited } = await createSignaledLoopHarness();
+      process.emit("SIGUSR1");
+
+      await expect(exited).resolves.toBe(1);
+      expect(acquireGatewayLock).toHaveBeenCalledTimes(1);
+      expect(start).toHaveBeenCalledTimes(1);
+      expect(gatewayLog.error).toHaveBeenCalledWith(
+        expect.stringContaining("exiting to force clean supervisor recovery"),
+      );
+    });
+  });
 });
 
 describe("gateway discover routing helpers", () => {

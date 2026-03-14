@@ -62,6 +62,14 @@ export async function runGatewayLoop(params: {
       return false;
     }
   };
+  const shouldExitOnFailedFullRestart = (detail: string | undefined): boolean => {
+    if (!detail) {
+      return false;
+    }
+    const normalized = detail.toLowerCase();
+    return normalized.includes("etimedout") && normalized.includes("launchctl");
+  };
+
   const handleRestartAfterServerClose = async () => {
     const hadLock = await releaseLockIfHeld();
     // Release the lock BEFORE spawning so the child can acquire it immediately.
@@ -76,6 +84,13 @@ export async function runGatewayLoop(params: {
       return;
     }
     if (respawn.mode === "failed") {
+      if (shouldExitOnFailedFullRestart(respawn.detail)) {
+        gatewayLog.error(
+          `full process restart failed (${respawn.detail ?? "unknown error"}); exiting to force clean supervisor recovery`,
+        );
+        exitProcess(1);
+        return;
+      }
       gatewayLog.warn(
         `full process restart failed (${respawn.detail ?? "unknown error"}); falling back to in-process restart`,
       );
